@@ -1,0 +1,2 @@
+#define FFMPEG_CONFIGURATION ""
+#define FFMPEG_LICENSE ""
