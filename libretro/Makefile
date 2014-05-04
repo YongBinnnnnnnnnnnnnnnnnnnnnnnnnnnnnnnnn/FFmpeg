@@ -27,8 +27,8 @@ ifeq ($(OPENGL),1)
 endif
    HAVE_SSA := 1
 
-   LIBS = $(shell pkg-config libavcodec libavformat libavutil libavdevice libswscale libass --libs) -pthread
-   CFLAGS += $(shell pkg-config libavcodec libavformat libavutil libavdevice libswscale libass --cflags) -pthread
+   LIBS = $(shell pkg-config libavcodec libavformat libavutil libswscale libass --libs) -pthread
+   CFLAGS += $(shell pkg-config libavcodec libavformat libavutil libswscale libass --cflags) -pthread
 ifeq ($(BAKE_IN_FFMPEG),0)
    LIBS += $(shell pkg-config libswresample --libs)
    CFLAGS += $(shell pkg-config libswresample --cflags)
@@ -48,8 +48,8 @@ ifneq ($(OSXVER),9)
    fpic += -mmacosx-version-min=10.5
 endif
 
-   LIBS = $(shell pkg-config libavcodec libavformat libavutil libavdevice libswscale libswresample libass --libs) -pthread
-   CFLAGS += $(shell pkg-config libavcodec libavformat libavutil libavdevice libswscale libswresample libass --cflags) -pthread
+   LIBS = $(shell pkg-config libavcodec libavformat libavutil libswscale libass --libs) -pthread
+   CFLAGS += $(shell pkg-config libavcodec libavformat libavutil libswscale libass --cflags) -pthread
 ifeq ($(BAKE_IN_FFMPEG),0)
    LIBS += $(shell pkg-config libswresample --libs)
    CFLAGS += $(shell pkg-config libswresample --cflags)
