@@ -3,7 +3,6 @@
 #define CONFIG_MEMORY_POISONING 0
 #define CONFIG_FTRAPV 0
 #define av_restrict restrict
-#define CONFIG_LIBMP3LAME 1
 
 #ifndef FF_MEMORY_POISON
 #define FF_MEMORY_POISON 0x2a
