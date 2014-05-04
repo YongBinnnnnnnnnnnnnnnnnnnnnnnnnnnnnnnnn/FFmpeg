@@ -1,5 +1,7 @@
 OPENGL = 1
 BAKE_IN_FFMPEG = 0
+HAVE_SSE2 = 0
+HAVE_MMX = 0
 
 ifeq ($(platform),)
 platform = unix
@@ -17,6 +19,7 @@ endif
 system = $(shell uname -m)
 
 ifeq ($(system),x86_64)
+ARCH_X86 = 1
 ARCH_X86_64 = 1
 endif
 
@@ -100,10 +103,33 @@ else
 CPUOPTS += -DHAVE_BIGENDIAN=0
 endif
 
-CPUOPTS += -DHAVE_MMX=0 -DARCH_X86=1 -DARCH_BFIN=0 -DHAVE_ALTIVEC=0 -DHAVE_MMX2=0 -DHAVE_MMXEXT=0 -DHAVE_MMX_INLINE=0 -DHAVE_MMXEXT_INLINE=0
+
+#Blackfin DSP. Pretty sure we won't target this for libretro (if ever).
+
+CPUOPTS += -DARCH_BFIN=0
+
+#We can reasonably assume MMX will be there on all x86 CPUs from 1997 and up at least
+#SSE2 can be assumed from Pentium 4 and up - can be switched on or off with the switch HAVE_SSE2
+
 CPUOPTS += -DHAVE_AMD3DNOW_INLINE=0
+
 ifeq ($(ARCH_X86),1)
+CPUOPTS += -DARCH_X86=1
+CPUOPTS += -DHAVE_MMX2=0
+ifeq ($(HAVE_MMX), 1)
+CPUOPTS += -DHAVE_MMX=1
+CPUOPTS += -DHAVE_MMXEXT=1
+CPUOPTS += -DHAVE_MMX_INLINE=1 -DHAVE_MMXEXT_INLINE=0
+else
+CPUOPTS += -DHAVE_MMX=0
+CPUOPTS += -DHAVE_MMXEXT=0
+CPUOPTS += -DHAVE_MMX_INLINE=0 -DHAVE_MMXEXT_INLINE=0
+endif
 CPUOPTS += -DHAVE_ALIGNED_STACK -DHAVE_FAST_UNALIGNED=0
+
+ifeq ($(HAVE_SSE2),1)
+CPUOPTS += -DHAVE_SSE2=1
+endif
 CPUOPTS += -DHAVE_SSE2_EXTERNAL=0
 CPUOPTS += -DHAVE_SSE3_EXTERNAL=0
 CPUOPTS += -DHAVE_SSSE3_EXTERNAL=0
