@@ -16,6 +16,10 @@ endif
 
 system = $(shell uname -m)
 
+ifeq ($(system),x86_64)
+ARCH_X86_64 = 1
+endif
+
 TARGET_NAME := ffmpeg
 
 ifneq (,$(findstring unix,$(platform)))
@@ -30,11 +34,11 @@ ifeq ($(OPENGL),1)
 endif
    HAVE_SSA := 1
 
-   LIBS = $(shell pkg-config libavcodec libavformat libswscale libass --libs) -pthread
-   CFLAGS += $(shell pkg-config libavcodec libavformat libswscale libass --cflags) -pthread
+   LIBS = $(shell pkg-config libavcodec libavformat libass --libs) -pthread
+   CFLAGS += $(shell pkg-config libavcodec libavformat libass --cflags) -pthread
 ifeq ($(BAKE_IN_FFMPEG),0)
-   LIBS += $(shell pkg-config libavutil libswresample --libs)
-   CFLAGS += $(shell pkg-config libavutil libswresample --cflags)
+   LIBS += $(shell pkg-config libavutil libswresample libswscale --libs)
+   CFLAGS += $(shell pkg-config libavutil libswresample libswscale --cflags)
 endif
 else ifneq (,$(findstring osx,$(platform)))
 	ARCH_X86 = 1
@@ -52,11 +56,11 @@ ifneq ($(OSXVER),9)
    fpic += -mmacosx-version-min=10.5
 endif
 
-   LIBS = $(shell pkg-config libavcodec libavformat libswscale libass --libs) -pthread
-   CFLAGS += $(shell pkg-config libavcodec libavformat libswscale libass --cflags) -pthread
+   LIBS = $(shell pkg-config libavcodec libavformat libass --libs) -pthread
+   CFLAGS += $(shell pkg-config libavcodec libavformat libass --cflags) -pthread
 ifeq ($(BAKE_IN_FFMPEG),0)
-   LIBS += $(shell pkg-config libavutil libswresample --libs)
-   CFLAGS += $(shell pkg-config libavutil libswresample --cflags)
+   LIBS += $(shell pkg-config libavutil libswresample libswscale --libs)
+   CFLAGS += $(shell pkg-config libavutil libswresample libswscale --cflags)
 endif
 else ifneq (,$(findstring win,$(platform)))
 	ARCH_X86 = 1
@@ -69,9 +73,9 @@ ifeq ($(OPENGL),1)
    CFLAGS += -DHAVE_GL
    HAVE_GL := 1
 endif
-   LIBS += -L. -Lffmpeg -lavcodec -lavformat -lswscale
+   LIBS += -L. -Lffmpeg -lavcodec -lavformat
 ifeq ($(BAKE_IN_FFMPEG),0)
-	LIBS += -lavutil -lswresample
+	LIBS += -lavutil -lswresample -lwscale
 endif
 endif
 
@@ -94,6 +98,24 @@ endif
 CPUOPTS += -DHAVE_MMX=0 -DARCH_X86=1 -DARCH_BFIN=0 -DHAVE_ALTIVEC=0 -DHAVE_MMXEXT=0 -DHAVE_MMX_INLINE=0 -DHAVE_MMXEXT_INLINE=0
 CPUOPTS += -DHAVE_AMD3DNOW_INLINE=0
 ifeq ($(ARCH_X86),1)
+CPUOPTS += -DHAVE_ALIGNED_STACK
+CPUOPTS += -DHAVE_SSE2_EXTERNAL=0
+CPUOPTS += -DHAVE_SSE3_EXTERNAL=0
+CPUOPTS += -DHAVE_SSSE3_EXTERNAL=0
+CPUOPTS += -DHAVE_SSE4_EXTERNAL=0
+CPUOPTS += -DHAVE_AVX_EXTERNAL=0
+else
+CPUOPTS += -DHAVE_SSE2_EXTERNAL=0
+CPUOPTS += -DHAVE_SSE3_EXTERNAL=0
+CPUOPTS += -DHAVE_SSSE3_EXTERNAL=0
+CPUOPTS += -DHAVE_SSE4_EXTERNAL=0
+CPUOPTS += -DHAVE_AVX_EXTERNAL=0
+endif
+
+ifeq ($(ARCH_X86_64),1)
+CPUOPTS += -DARCH_X86_64=1
+else
+CPUOPTS += -DARCH_X86_64=0
 endif
 
 #This is ARMv8/NEON
@@ -149,19 +171,21 @@ SOURCE += $(AVUTIL_DIR)/atomic.c \
 			 $(AVUTIL_DIR)/samplefmt.c \
 			 $(AVUTIL_DIR)/log.c \
 			 $(AVUTIL_DIR)/cpu.c \
-			 $(AVUTIL_DIR)/time.c
+			 $(AVUTIL_DIR)/time.c \
+			 $(AVUTIL_DIR)/log2_tab.c
 
-#SOURCE += $(SWSCALE_DIR)/input.c \
+SOURCE += $(SWSCALE_DIR)/input.c \
 			 $(SWSCALE_DIR)/options.c \
 			 $(SWSCALE_DIR)/output.c \
 			 $(SWSCALE_DIR)/rgb2rgb.c \
 			 $(SWSCALE_DIR)/swscale.c \
+			 $(SWSCALE_DIR)/swscale_unscaled.c \
 			 $(SWSCALE_DIR)/utils.c \
 			 $(SWSCALE_DIR)/yuv2rgb.c
 
 ifeq ($(ARCH_X86),1)
 			 SOURCE += $(AVUTIL_DIR)/x86/cpu.c
-			 #SOURCE += $(SWSCALE_DIR)/x86/rgb2rgb.c \
+			 SOURCE += $(SWSCALE_DIR)/x86/rgb2rgb.c \
 				 			$(SWSCALE_DIR)/x86/swscale.c \
 							$(SWSCALE_DIR)/x86/yuv2rgb.c
 endif
@@ -177,7 +201,7 @@ endif
 
 ifeq ($(ARCH_ARM),1)
 			 SOURCE += $(AVUTIL_DIR)/arm/cpu.c
-			 #SOURCE += $(SWSCALE_DIR)/arm/swscale_unscaled.c
+			 SOURCE += $(SWSCALE_DIR)/arm/swscale_unscaled.c
 endif
 
 SOURCE += $(SWRESAMPLE_DIR)/audioconvert.c \
