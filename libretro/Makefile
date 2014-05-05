@@ -4,6 +4,18 @@ INTERNAL_LIBAVUTIL     = 0
 INTERNAL_LIBSWRESAMPLE = 0
 INTERNAL_LIBSWSCALE    = 0
 
+INTERNAL_LIBFLAC       = 0
+INTERNAL_LIBOGG        = 0
+INTERNAL_LIBLAME       = 0
+INTERNAL_LIBFAAC       = 0
+INTERNAL_LIBTHEORA     = 0
+INTERNAL_LIBVORBIS     = 0
+INTERNAL_WEBP          = 0
+INTERNAL_ZLIB          = 0
+INTERNAL_WAVPACK       = 0
+INTERNAL_XVIDCORE      = 0
+INTERNAL_VPX           = 0
+
 BAKE_IN_FFMPEG := 0
 
 #CPU Optimization flags
@@ -12,7 +24,18 @@ HAVE_MMX = 0
 HAVE_THREADS = 1
 
 #Additional codec support for internal FFmpeg
-HAVE_OPUS = 0
+HAVE_LIBSPEEX  = 0
+HAVE_LIBWEBP   = 0
+HAVE_LIBOGG    = 0
+HAVE_LIBX264   = 0
+HAVE_LIBX265   = 0
+HAVE_LIBFAAC   = 0
+HAVE_LIBFLAC   = 0
+HAVE_LIBLAME   = 0
+HAVE_LIBVORBIS = 0
+HAVE_LIBTHEORA = 0
+HAVE_LIBOPUS   = 0
+HAVE_ZLIB      = 0
 
 #Video support
 OPENGL = 1
@@ -60,28 +83,33 @@ endif
 	HAVE_NETWORK = 1
 	HAVE_SOCKLEN = 1
 	HAVE_PTHREADS = 1
-ifneq ($(INTERNAL_LIBAVCODEC),1)
+ifeq ($(INTERNAL_LIBAVCODEC),1)
 	BAKE_IN_FFMPEG += 1
+else
    LIBS += $(shell pkg-config libavcodec --libs)
    CFLAGS += $(shell pkg-config libavcodec --cflags)
 endif
-ifneq ($(INTERNAL_LIBAVFORMAT),1)
+ifeq ($(INTERNAL_LIBAVFORMAT),1)
 	BAKE_IN_FFMPEG += 1
+else
    LIBS += $(shell pkg-config libavformat --libs)
    CFLAGS += $(shell pkg-config libavformat --cflags)
 endif
-ifneq ($(INTERNAL_LIBSWRESAMPLE),1)
+ifeq ($(INTERNAL_LIBSWRESAMPLE),1)
 	BAKE_IN_FFMPEG += 1
+else
    LIBS += $(shell pkg-config libswresample --libs)
    CFLAGS += $(shell pkg-config libswresample --cflags)
 endif
-ifneq ($(INTERNAL_LIBAVUTIL),1)
+ifeq ($(INTERNAL_LIBAVUTIL),1)
 	BAKE_IN_FFMPEG += 1
+else
    LIBS += $(shell pkg-config libavutil --libs)
    CFLAGS += $(shell pkg-config libavutil --cflags)
 endif
-ifneq ($(INTERNAL_LIBSWSCALE),1)
+ifeq ($(INTERNAL_LIBSWSCALE),1)
 	BAKE_IN_FFMPEG += 1
+else
    LIBS += $(shell pkg-config libswscale --libs)
    CFLAGS += $(shell pkg-config libswscale --cflags)
 endif
@@ -104,23 +132,33 @@ endif
 
    LIBS = $(shell pkg-config libass --libs) -pthread
    CFLAGS += $(shell pkg-config libass --cflags) -pthread
-ifneq ($(INTERNAL_LIBAVCODEC),1)
+ifeq ($(INTERNAL_LIBAVCODEC),1)
+	BAKE_IN_FFMPEG += 1
+else
    LIBS += $(shell pkg-config libavcodec --libs)
    CFLAGS += $(shell pkg-config libavcodec --cflags)
 endif
-ifneq ($(INTERNAL_LIBAVFORMAT),1)
+ifeq ($(INTERNAL_LIBAVFORMAT),1)
+	BAKE_IN_FFMPEG += 1
+else
    LIBS += $(shell pkg-config libavformat --libs)
    CFLAGS += $(shell pkg-config libavformat --cflags)
 endif
-ifneq ($(INTERNAL_LIBSWRESAMPLE),1)
+ifeq ($(INTERNAL_LIBSWRESAMPLE),1)
+	BAKE_IN_FFMPEG += 1
+else
    LIBS += $(shell pkg-config libswresample --libs)
    CFLAGS += $(shell pkg-config libswresample --cflags)
 endif
-ifneq ($(INTERNAL_LIBAVUTIL),1)
+ifeq ($(INTERNAL_LIBAVUTIL),1)
+	BAKE_IN_FFMPEG += 1
+else
    LIBS += $(shell pkg-config libavutil --libs)
    CFLAGS += $(shell pkg-config libavutil --cflags)
 endif
-ifneq ($(INTERNAL_LIBSWSCALE),1)
+ifeq ($(INTERNAL_LIBSWSCALE),1)
+	BAKE_IN_FFMPEG += 1
+else
    LIBS += $(shell pkg-config libswscale --libs)
    CFLAGS += $(shell pkg-config libswscale --cflags)
 endif
@@ -137,32 +175,43 @@ ifeq ($(OPENGL),1)
 	WIN32_PLATFORM := 1
 endif
    LIBS += -L.
-ifneq ($(INTERNAL_LIBAVCODEC),1)
+ifeq ($(INTERNAL_LIBAVCODEC),1)
+	BAKE_IN_FFMPEG += 1
+else
    LIBS += -lavcodec
 endif
-ifneq ($(INTERNAL_LIBAVFORMAT),1)
+ifeq ($(INTERNAL_LIBAVFORMAT),1)
+	BAKE_IN_FFMPEG += 1
+else
    LIBS += -lavformat
 endif
-ifneq ($(INTERNAL_LIBSWRESAMPLE),1)
+ifeq ($(INTERNAL_LIBSWRESAMPLE),1)
+	BAKE_IN_FFMPEG += 1
+else
    LIBS += -lswresample
 endif
-ifneq ($(INTERNAL_LIBAVUTIL),1)
+ifeq ($(INTERNAL_LIBAVUTIL),1)
+	BAKE_IN_FFMPEG += 1
+else
    LIBS += -lavutil
 endif
-ifneq ($(INTERNAL_LIBSWSCALE),1)
+ifeq ($(INTERNAL_LIBSWSCALE),1)
+	BAKE_IN_FFMPEG += 1
+else
 	LIBS += -lwscale
 endif
 endif
+
 
 ifeq ($(HAVE_SSA), 1)
    LIBS += $(shell pkg-config libass --libs)
    CFLAGS += -DHAVE_SSA
 endif
 
-SOURCE := libretro.c fifo_buffer.c thread.c
-
-ifneq ($(BAKE_IN_FFMPEG),0)
-LIBS += -lm
+LIBAVCODEC_SOURCE :=
+LIBAVFORMAT_SOURCE :=
+LIBAVUTIL_SOURCE :=
+LIBRETRO_SOURCE := libretro.c fifo_buffer.c thread.c
 
 ifeq ($(HAVE_BIGENDIAN),1)
 CPUOPTS += -DHAVE_BIGENDIAN=1
@@ -170,8 +219,67 @@ else
 CPUOPTS += -DHAVE_BIGENDIAN=0
 endif
 
+ifneq ($(BAKE_IN_FFMPEG),0)
 
-#if BAKE_IN_FFMPEG is defined, bake in some more dependencies
+ifeq ($(INTERNAL_LIBAVCODEC),1)
+
+ifeq ($(INTERNAL_ZLIB),0)
+	LIBS += -lz
+endif
+
+ifeq ($(INTERNAL_LIBFLAC),0)
+	LIBS += -lFLAC
+	HAVE_LIBFLAC = 1
+endif
+
+ifeq ($(INTERNAL_LIBVORBIS),0)
+	LIBS += -lvorbis -lvorbisenc -lvorbisfile
+	HAVE_LIBVORBIS = 1
+endif
+
+ifeq ($(INTERNAL_LIBLAME),0)
+	LIBS += -lmp3lame
+	HAVE_LIBLAME = 1
+endif
+
+ifeq ($(INTERNAL_WEBP),0)
+	LIBS += -lwebp
+	HAVE_LIBWEBP = 1
+endif
+
+ifeq ($(INTERNAL_LIBOGG),0)
+	LIBS += -logg
+	HAVE_LIBOGG = 1
+endif
+
+ifeq ($(INTERNAL_LIBFAAC),0)
+	LIBS += -lfaac
+	HAVE_LIBFAAC = 1
+endif
+
+ifeq ($(INTERNAL_WAVPACK),0)
+	LIBS += -lwavpack
+endif
+
+ifeq ($(INTERNAL_XVIDCORE),0)
+   LIBS += -lxvidcore
+endif
+
+ifeq ($(INTERNAL_LIBTHEORA),0)
+	LIBS += -ltheora -ltheoraenc -ltheoradec
+	HAVE_LIBTHEORA = 1
+endif
+
+ifeq ($(INTERNAL_VPX),0)
+	LIBS += -lvpx
+	HAVE_VPX = 1
+endif
+
+endif
+
+LIBS += -lm
+
+CFLAGS += -DCONFIG_SMALL=0
 
 ## CPU Flags
 
@@ -187,23 +295,42 @@ CPUOPTS += -DHAVE_AMD3DNOW_INLINE=0
 ifeq ($(ARCH_X86),1)
 CPUOPTS += -DARCH_X86=1
 CPUOPTS += -DHAVE_MMX2=0
+CPUOPTS += -DHAVE_EBX_AVAILABLE=1
+CPUOPTS += -DHAVE_EBP_AVAILABLE=1
 ifeq ($(HAVE_MMX), 1)
 CPUOPTS += -DHAVE_MMX=1
 CPUOPTS += -DHAVE_MMXEXT=1
+CPUOPTS += -DHAVE_MMX_EXTERNAL=1
+CPUOPTS += -DHAVE_MMXEXT_EXTERNAL=1
+CPUOPTS += -DHAVE_AMD3DNOW_EXTERNAL=0
 CPUOPTS += -DHAVE_MMX_INLINE=1 -DHAVE_MMXEXT_INLINE=0
 else
 CPUOPTS += -DHAVE_MMX=0
 CPUOPTS += -DHAVE_MMXEXT=0
+CPUOPTS += -DHAVE_MMX_EXTERNAL=0
+CPUOPTS += -DHAVE_MMXEXT_EXTERNAL=0
+CPUOPTS += -DHAVE_AMD3DNOW_EXTERNAL=0
 CPUOPTS += -DHAVE_MMX_INLINE=0 -DHAVE_MMXEXT_INLINE=0
 endif
 CPUOPTS += -DHAVE_ALIGNED_STACK -DHAVE_FAST_UNALIGNED=0
 
+ifeq ($(HAVE_SSE1),1)
+CPUOPTS += -DHAVE_SSE=1
+CPUOPTS += -DHAVE_SSE_EXTERNAL=1
+else
+CPUOPTS += -DHAVE_SSE=0
+CPUOPTS += -DHAVE_SSE_EXTERNAL=0
+endif
+
 ifeq ($(HAVE_SSE2),1)
 CPUOPTS += -DHAVE_SSE2=1
-endif
-CPUOPTS += -DHAVE_FMA3_EXTERNAL=0
-CPUOPTS += -DHAVE_SSE_EXTERNAL=0
+CPUOPTS += -DHAVE_SSE2_EXTERNAL=1
+else
+CPUOPTS += -DHAVE_SSE2=0
 CPUOPTS += -DHAVE_SSE2_EXTERNAL=0
+endif
+
+CPUOPTS += -DHAVE_FMA3_EXTERNAL=0
 CPUOPTS += -DHAVE_SSE3_EXTERNAL=0
 CPUOPTS += -DHAVE_SSSE3_EXTERNAL=0
 CPUOPTS += -DHAVE_SSE4_EXTERNAL=0
@@ -254,9 +381,11 @@ ifeq ($(ARCH_MIPS),1)
 # Not sure if we can just define this for all MIPS archs - probably not
 CPUOPTS += -DHAVE_MIPSFPU=1
 CPUOPTS += -DARCH_MIPS=1
+CPUOPTS += -DHAVE_MIPSDSPR1=0
 else
 CPUOPTS += -DHAVE_MIPSFPU=0
 CPUOPTS += -DARCH_MIPS=0
+CPUOPTS += -DHAVE_MIPSDSPR1=0
 endif
 
 ifeq ($(ARCH_ALPHA),1)
@@ -309,9 +438,43 @@ CFLAGS += -DHAVE_THREADS=0
 CFLAGS += -DHAVE_PTHREADS=0
 endif
 
+ifeq ($(HAVE_LIBLAME),1)
+CFLAGS += -DCONFIG_LIBMP3LAME=1 \
+			 -DCONFIG_LIBMP3LAME_ENCODER=1
+else
 CFLAGS += -DCONFIG_LIBMP3LAME=0 \
-			 -DCONFIG_LIBVORBIS=0 \
-			 -DCONFIG_ZLIB=0 
+			 -DCONFIG_LIBMP3LAME_ENCODER=0
+endif
+
+ifeq ($(HAVE_LIBVORBIS),1)
+CFLAGS += -DCONFIG_LIBVORBIS=1 \
+			 -DCONFIG_VORBIS_ENCODER=1 \
+			 -DCONFIG_LIBVORBIS_ENCODER=1 \
+			 -DCONFIG_VORBIS_DECODER=1 \
+			 -DCONFIG_LIBVORBIS_DECODER=1 \
+			 -DCONFIG_VORBIS_PARSER=1
+else
+CFLAGS += -DCONFIG_LIBVORBIS=0 \
+			 -DCONFIG_VORBIS_ENCODER=0 \
+			 -DCONFIG_LIBVORBIS_ENCODER=0 \
+			 -DCONFIG_VORBIS_DECODER=0 \
+			 -DCONFIG_LIBVORBIS_DECODER=0 \
+			 -DCONFIG_VORBIS_PARSER=0
+endif
+
+ifeq ($(HAVE_LIBTHEORA),1)
+CFLAGS += -DCONFIG_LIBTHEORA_ENCODER=1 \
+			 -DCONFIG_THEORA_DECODER=1
+else
+CFLAGS += -DCONFIG_LIBTHEORA_ENCODER=0 \
+			 -DCONFIG_THEORA_DECODER=0
+endif
+
+ifeq ($(HAVE_ZLIB),1)
+CFLAGS += -DCONFIG_ZLIB=1
+else
+CFLAGS += -DCONFIG_ZLIB=0 
+endif
 
 #Protocol flags
 CFLAGS +=  \
@@ -437,7 +600,6 @@ CFLAGS += \
 			 -DCONFIG_ALAC_ENCODER=1 \
 			 -DCONFIG_DCA_ENCODER=1 \
 			 -DCONFIG_EAC3_ENCODER=1 \
-			 -DCONFIG_FLAC_ENCODER=1 \
 			 -DCONFIG_G723_1_ENCODER=1 \
 			 -DCONFIG_MP2_ENCODER=1 \
 			 -DCONFIG_NELLYMOSER_ENCODER=1 \
@@ -445,7 +607,6 @@ CFLAGS += \
 			 -DCONFIG_SONIC_ENCODER=1 \
 			 -DCONFIG_SONIC_LS_ENCODER=1 \
 			 -DCONFIG_TTA_ENCODER=1 \
-			 -DCONFIG_VORBIS_ENCODER=1 \
 			 -DCONFIG_WAVPACK_ENCODER=1 \
 			 -DCONFIG_WMAV1_ENCODER=1 \
 			 -DCONFIG_WMAV2_ENCODER=1 \
@@ -492,39 +653,77 @@ CFLAGS += \
 			 -DCONFIG_SRT_ENCODER=1 \
 			 -DCONFIG_SUBRIP_ENCODER=1 \
 			 -DCONFIG_XSUB_ENCODER=1 \
-			 -DCONFIG_LIBFAAC_ENCODER=1 \
 			 -DCONFIG_LIBFDK_AAC_ENCODER=0 \
 			 -DCONFIG_LIBGSM_ENCODER=0 \
 			 -DCONFIG_LIBGSM_MS_ENCODER=0 \
 			 -DCONFIG_LIBILBC_ENCODER=0 \
-			 -DCONFIG_LIBMP3LAME_ENCODER=1 \
 			 -DCONFIG_LIBOPENCORE_AMRNB_ENCODER=0 \
 			 -DCONFIG_LIBOPENJPEG_ENCODER=0 \
 			 -DCONFIG_LIBSCHROEDINGER_ENCODER=0 \
 			 -DCONFIG_LIBSHINE_ENCODER=0 \
-			 -DCONFIG_LIBSPEEX_ENCODER=0 \
-			 -DCONFIG_LIBTHEORA_ENCODER=1 \
 			 -DCONFIG_LIBTWOLAME_ENCODER=0 \
 			 -DCONFIG_LIBUTVIDEO_ENCODER=0 \
 			 -DCONFIG_LIBVO_AACENC_ENCODER=0 \
 			 -DCONFIG_LIBVO_AMRWBENC_ENCODER=0 \
-			 -DCONFIG_LIBVORBIS_ENCODER=1 \
-			 -DCONFIG_LIBVPX_VP8_ENCODER=1 \
-			 -DCONFIG_LIBVPX_VP9_ENCODER=0 \
 			 -DCONFIG_LIBWAVPACK_ENCODER=0 \
-			 -DCONFIG_LIBX264_ENCODER=1 \
-			 -DCONFIG_LIBX264RGB_ENCODER=1 \
 			 -DCONFIG_LIBXAVS_ENCODER=0 \
 			 -DCONFIG_LIBXVID_ENCODER=1 \
 			 -DCONFIG_MP2FIXED_ENCODER=1 \
-			 -DCONFIG_LIBWEBP_ENCODER=1 \
-			 -DCONFIG_LIBX265_ENCODER=1 \
 			 -DCONFIG_LIBAACPLUS_ENCODER=0
 
-ifeq ($(HAVE_LIBOPUS),1)
-	CFLAGS += -DCONFIG_LIBOPUS_ENCODER=1
+ifeq ($(HAVE_LIBFLAC),1)
+CFLAGS += -DCONFIG_FLAC_ENCODER=1 \
+			 -DCONFIG_FLAC_PARSER=1
 else
-	CFLAGS += -DCONFIG_LIBOPUS_ENCODER=0
+CFLAGS += -DCONFIG_FLAC_ENCODER=0 \
+			 -DCONFIG_FLAC_PARSER=0
+endif
+
+ifeq ($(HAVE_LIBWEBP),1)
+CFLAGS += -DCONFIG_LIBWEBP_ENCODER=1
+else
+CFLAGS += -DCONFIG_LIBWEBP_ENCODER=0
+endif
+
+ifeq ($(HAVE_VPX),1)
+CFLAGS += -DCONFIG_LIBVPX_VP8_ENCODER=1 \
+			 -DCONFIG_LIBVPX_VP9_ENCODER=1
+else
+CFLAGS += -DCONFIG_LIBVPX_VP8_ENCODER=0 \
+			 -DCONFIG_LIBVPX_VP9_ENCODER=0
+endif
+
+ifeq ($(HAVE_LIBFAAC),1)
+CFLAGS += -DCONFIG_LIBFAAC_ENCODER=1
+else
+CFLAGS += -DCONFIG_LIBFAAC_ENCODER=0
+endif
+ifeq ($(HAVE_LIBX264),1)
+CFLAGS += \
+			 -DCONFIG_LIBX264_ENCODER=1 \
+			 -DCONFIG_LIBX264RGB_ENCODER=1
+else
+CFLAGS += \
+			 -DCONFIG_LIBX264_ENCODER=0 \
+			 -DCONFIG_LIBX264RGB_ENCODER=0
+endif
+
+ifeq ($(HAVE_LIBX265),1)
+CFLAGS += -DCONFIG_LIBX265_ENCODER=1
+else
+CFLAGS += -DCONFIG_LIBX265_ENCODER=0
+endif
+
+ifeq ($(HAVE_LIBSPEEX),1)
+CFLAGS += -DCONFIG_LIBSPEEX_ENCODER=1
+else
+CFLAGS += -DCONFIG_LIBSPEEX_ENCODER=0
+endif
+
+ifeq ($(HAVE_LIBOPUS),1)
+CFLAGS += -DCONFIG_LIBOPUS_ENCODER=1
+else
+CFLAGS += -DCONFIG_LIBOPUS_ENCODER=0
 endif
 
 # Decoder switches
@@ -576,7 +775,7 @@ CFLAGS += \
 			 -DCONFIG_DPX_DECODER=1 \
 			 -DCONFIG_DSICINVIDEO_DECODER=1 \
 			 -DCONFIG_DVVIDEO_DECODER=1 \
-			 -DCONFIG_DXA_DECODER=1 \
+			 -DCONFIG_DXA_DECODER=0 \
 			 -DCONFIG_DXTORY_DECODER=1 \
 			 -DCONFIG_EACMV_DECODER=1 \
 			 -DCONFIG_EAMAD_DECODER=1 \
@@ -608,7 +807,6 @@ CFLAGS += \
 			 -DCONFIG_H264_DECODER=1 \
 			 -DCONFIG_H264_CRYSTALHD_DECODER=0 \
 			 -DCONFIG_H264_VDA_DECODER=0 \
-			 -DCONFIG_H264_VDPAU_DECODER=1 \
 			 -DCONFIG_HEVC_DECODER=1 \
 			 -DCONFIG_HNM4_VIDEO_DECODER=1 \
 			 -DCONFIG_HUFFYUV_DECODER=1 \
@@ -638,10 +836,7 @@ CFLAGS += \
 			 -DCONFIG_MPEG2VIDEO_DECODER=1 \
 			 -DCONFIG_MPEG4_DECODER=1 \
 			 -DCONFIG_MPEG4_CRYSTALHD_DECODER=0 \
-			 -DCONFIG_MPEG4_VDPAU_DECODER=1 \
 			 -DCONFIG_MPEGVIDEO_DECODER=1 \
-			 -DCONFIG_MPEG_VDPAU_DECODER=1 \
-			 -DCONFIG_MPEG1_VDPAU_DECODER=1 \
 			 -DCONFIG_MPEG2_CRYSTALHD_DECODER=0 \
 			 -DCONFIG_MSA1_DECODER=1 \
 			 -DCONFIG_MSMPEG4_CRYSTALHD_DECODER=0 \
@@ -697,7 +892,6 @@ CFLAGS += \
 			 -DCONFIG_SVQ3_DECODER=1 \
 			 -DCONFIG_TARGA_DECODER=1 \
 			 -DCONFIG_TARGA_Y216_DECODER=1 \
-			 -DCONFIG_THEORA_DECODER=1 \
 			 -DCONFIG_THP_DECODER=1 \
 			 -DCONFIG_TIERTEXSEQVIDEO_DECODER=1 \
 			 -DCONFIG_TIFF_DECODER=1 \
@@ -718,7 +912,6 @@ CFLAGS += \
 			 -DCONFIG_VBLE_DECODER=1 \
 			 -DCONFIG_VC1_DECODER=1 \
 			 -DCONFIG_VC1_CRYSTALHD_DECODER=0 \
-			 -DCONFIG_VC1_VDPAU_DECODER=1 \
 			 -DCONFIG_VC1IMAGE_DECODER=1 \
 			 -DCONFIG_VCR1_DECODER=1 \
 			 -DCONFIG_VMDVIDEO_DECODER=1 \
@@ -732,12 +925,10 @@ CFLAGS += \
 			 -DCONFIG_VP8_DECODER=1 \
 			 -DCONFIG_VP9_DECODER=1 \
 			 -DCONFIG_VQA_DECODER=1 \
-			 -DCONFIG_WEBP_DECODER=1 \
 			 -DCONFIG_WMV1_DECODER=1 \
 			 -DCONFIG_WMV2_DECODER=1 \
 			 -DCONFIG_WMV3_DECODER=1 \
 			 -DCONFIG_WMV3_CRYSTALHD_DECODER=0 \
-			 -DCONFIG_WMV3_VDPAU_DECODER=1 \
 			 -DCONFIG_WMV3IMAGE_DECODER=1 \
 			 -DCONFIG_WNV1_DECODER=1 \
 			 -DCONFIG_XAN_WC3_DECODER=1 \
@@ -772,7 +963,6 @@ CFLAGS += \
 			 -DCONFIG_EAC3_DECODER=1 \
 			 -DCONFIG_EVRC_DECODER=1 \
 			 -DCONFIG_FFWAVESYNTH_DECODER=1 \
-			 -DCONFIG_FLAC_DECODER=1 \
 			 -DCONFIG_G723_1_DECODER=1 \
 			 -DCONFIG_G729_DECODER=1 \
 			 -DCONFIG_GSM_DECODER=1 \
@@ -812,7 +1002,6 @@ CFLAGS += \
 			 -DCONFIG_TTA_DECODER=1 \
 			 -DCONFIG_TWINVQ_DECODER=1 \
 			 -DCONFIG_VMDAUDIO_DECODER=1 \
-			 -DCONFIG_VORBIS_DECODER=1 \
 			 -DCONFIG_WAVPACK_DECODER=1 \
 			 -DCONFIG_WMALOSSLESS_DECODER=1 \
 			 -DCONFIG_WMAPRO_DECODER=1 \
@@ -919,18 +1108,41 @@ CFLAGS += \
 			 -DCONFIG_LIBOPENCORE_AMRWB_DECODER=0 \
 			 -DCONFIG_LIBOPENJPEG_DECODER=0 \
 			 -DCONFIG_LIBSCHROEDINGER_DECODER=0 \
-			 -DCONFIG_LIBSPEEX_DECODER=0 \
 			 -DCONFIG_LIBSTAGEFRIGHT_H264_DECODER=0 \
 			 -DCONFIG_LIBUTVIDEO_DECODER=0 \
-			 -DCONFIG_LIBVORBIS_DECODER=1 \
-			 -DCONFIG_LIBVPX_VP8_DECODER=1 \
-			 -DCONFIG_LIBVPX_VP9_DECODER=0 \
 			 -DCONFIG_LIBZVBI_TELETEXT_DECODER=0 \
 			 -DCONFIG_BINTEXT_DECODER=1 \
 			 -DCONFIG_XBIN_DECODER=1 \
 			 -DCONFIG_IDF_DECODER=1 
 
-ifeq ($(HAVE_OPUS),1)
+ifeq ($(HAVE_LIBFLAC),1)
+CFLAGS += -DCONFIG_FLAC_DECODER=1
+else
+CFLAGS += -DCONFIG_FLAC_DECODER=0
+endif
+
+ifeq ($(HAVE_LIBWEBP),1)
+CFLAGS += -DCONFIG_WEBP_DECODER=1
+else
+CFLAGS += -DCONFIG_WEBP_DECODER=0
+endif
+
+ifeq ($(HAVE_VPX),1)
+CFLAGS += \
+			 -DCONFIG_LIBVPX_VP8_DECODER=1 \
+			 -DCONFIG_LIBVPX_VP9_DECODER=1
+else
+CFLAGS += -DCONFIG_LIBVPX_VP8_DECODER=0 \
+			 -DCONFIG_LIBVPX_VP9_DECODER=0
+endif
+
+ifeq ($(HAVE_LIBSPEEX),1)
+CFLAGS += -DCONFIG_LIBSPEEX_DECODER=1
+else
+CFLAGS += -DCONFIG_LIBSPEEX_DECODER=0
+endif
+
+ifeq ($(HAVE_LIBOPUS),1)
 CFLAGS += -DCONFIG_OPUS_MUXER=1
 CFLAGS += -DCONFIG_LIBOPUS_DECODER=1
 else
@@ -949,69 +1161,79 @@ BASE_DIR := ../
 ifeq ($(INTERNAL_LIBAVUTIL),1)
 CFLAGS += -DHAVE_AV_CONFIG_H
 
-SOURCE += $(AVUTIL_DIR)/atomic.c \
-			 $(AVUTIL_DIR)/audio_fifo.c \
-			 $(AVUTIL_DIR)/adler32.c \
-			 $(AVUTIL_DIR)/aes.c \
-			 $(AVUTIL_DIR)/avstring.c \
-			 $(AVUTIL_DIR)/base64.c \
-			 $(AVUTIL_DIR)/buffer.c \
-			 $(AVUTIL_DIR)/crc.c \
-			 $(AVUTIL_DIR)/des.c \
-			 $(AVUTIL_DIR)/dict.c \
-			 $(AVUTIL_DIR)/eval.c \
-			 $(AVUTIL_DIR)/error.c \
-			 $(AVUTIL_DIR)/file.c \
-			 $(AVUTIL_DIR)/file_open.c \
-			 $(AVUTIL_DIR)/fifo.c \
-			 $(AVUTIL_DIR)/float_dsp.c \
-			 $(AVUTIL_DIR)/frame.c \
-			 $(AVUTIL_DIR)/hash.c \
-			 $(AVUTIL_DIR)/hmac.c \
-			 $(AVUTIL_DIR)/lfg.c \
-			 $(AVUTIL_DIR)/mathematics.c \
-			 $(AVUTIL_DIR)/mem.c \
-			 $(AVUTIL_DIR)/murmur3.c \
-			 $(AVUTIL_DIR)/channel_layout.c \
-			 $(AVUTIL_DIR)/opt.c \
-			 $(AVUTIL_DIR)/sha.c \
-			 $(AVUTIL_DIR)/sha512.c \
-			 $(AVUTIL_DIR)/bprint.c \
-			 $(AVUTIL_DIR)/parseutils.c \
-			 $(AVUTIL_DIR)/random_seed.c \
-			 $(AVUTIL_DIR)/rc4.c \
-			 $(AVUTIL_DIR)/pixdesc.c \
-			 $(AVUTIL_DIR)/rational.c \
-			 $(AVUTIL_DIR)/ripemd.c \
-			 $(AVUTIL_DIR)/imgutils.c \
-			 $(AVUTIL_DIR)/samplefmt.c \
-			 $(AVUTIL_DIR)/log.c \
-			 $(AVUTIL_DIR)/cpu.c \
-			 $(AVUTIL_DIR)/time.c \
-			 $(AVUTIL_DIR)/timecode.c \
-			 $(AVUTIL_DIR)/tree.c \
-			 $(AVUTIL_DIR)/utils.c \
-			 $(AVUTIL_DIR)/md5.c \
-			 $(AVUTIL_DIR)/log2_tab.c
+LIBAVUTIL_SOURCE += \
+						  $(AVUTIL_DIR)/downmix_info.c \
+						  $(AVUTIL_DIR)/xga_font_data.c \
+						  $(AVUTIL_DIR)/intfloat_readwrite.c \
+						  $(AVUTIL_DIR)/intmath.c \
+						  $(AVUTIL_DIR)/atomic.c \
+						  $(AVUTIL_DIR)/audio_fifo.c \
+						  $(AVUTIL_DIR)/adler32.c \
+						  $(AVUTIL_DIR)/aes.c \
+						  $(AVUTIL_DIR)/lls2.c \
+						  $(AVUTIL_DIR)/lzo.c \
+						  $(AVUTIL_DIR)/fixed_dsp.c \
+						  $(AVUTIL_DIR)/avstring.c \
+						  $(AVUTIL_DIR)/base64.c \
+						  $(AVUTIL_DIR)/buffer.c \
+						  $(AVUTIL_DIR)/crc.c \
+						  $(AVUTIL_DIR)/des.c \
+						  $(AVUTIL_DIR)/dict.c \
+						  $(AVUTIL_DIR)/eval.c \
+						  $(AVUTIL_DIR)/error.c \
+						  $(AVUTIL_DIR)/file.c \
+						  $(AVUTIL_DIR)/file_open.c \
+						  $(AVUTIL_DIR)/fifo.c \
+						  $(AVUTIL_DIR)/float_dsp.c \
+						  $(AVUTIL_DIR)/frame.c \
+						  $(AVUTIL_DIR)/hash.c \
+						  $(AVUTIL_DIR)/hmac.c \
+						  $(AVUTIL_DIR)/lfg.c \
+						  $(AVUTIL_DIR)/mathematics.c \
+						  $(AVUTIL_DIR)/mem.c \
+						  $(AVUTIL_DIR)/murmur3.c \
+						  $(AVUTIL_DIR)/channel_layout.c \
+						  $(AVUTIL_DIR)/opt.c \
+						  $(AVUTIL_DIR)/sha.c \
+						  $(AVUTIL_DIR)/sha512.c \
+						  $(AVUTIL_DIR)/bprint.c \
+						  $(AVUTIL_DIR)/parseutils.c \
+						  $(AVUTIL_DIR)/random_seed.c \
+						  $(AVUTIL_DIR)/rc4.c \
+						  $(AVUTIL_DIR)/pixdesc.c \
+						  $(AVUTIL_DIR)/rational.c \
+						  $(AVUTIL_DIR)/ripemd.c \
+						  $(AVUTIL_DIR)/imgutils.c \
+						  $(AVUTIL_DIR)/samplefmt.c \
+						  $(AVUTIL_DIR)/log.c \
+						  $(AVUTIL_DIR)/stereo3d.c \
+						  $(AVUTIL_DIR)/cpu.c \
+						  $(AVUTIL_DIR)/time.c \
+						  $(AVUTIL_DIR)/timecode.c \
+						  $(AVUTIL_DIR)/tree.c \
+						  $(AVUTIL_DIR)/utils.c \
+						  $(AVUTIL_DIR)/md5.c \
+						  $(AVUTIL_DIR)/log2_tab.c
 
 ifeq ($(ARCH_X86),1)
-			 SOURCE += \
+			 LIBAVUTIL_SOURCE += \
 						  $(AVUTIL_DIR)/x86/cpu.c \
+						  $(AVUTIL_DIR)/x86/lls_init.c \
 						  $(AVUTIL_DIR)/x86/float_dsp_init.c
 endif
 
 
 ifeq ($(ARCH_PPC),1)
-			SOURCE += $(AVUTIL_DIR)/ppc/cpu.c \
+			LIBAVUTIL_SOURCE += $(AVUTIL_DIR)/ppc/cpu.c \
 						 $(AVUTIL_DIR)/ppc/float_dsp_init.c
 endif
 
 ifeq ($(HAVE_ALTIVEC),1)
-			SOURCE += $(AVUTIL_DIR)/ppc/float_dsp_altivec.c
+			LIBAVUTIL_SOURCE += $(AVUTIL_DIR)/ppc/float_dsp_altivec.c
 endif
 
 ifeq ($(ARCH_ARM),1)
-			 SOURCE += $(AVUTIL_DIR)/arm/cpu.c
+			 LIBAVUTIL_SOURCE += $(AVUTIL_DIR)/arm/cpu.c
 endif
 
 endif
@@ -1019,7 +1241,7 @@ endif
 #libswscale
 ifeq ($(INTERNAL_LIBSWSCALE),1)
 CFLAGS += -DHAVE_SWSCALE_H -DCONFIG_SWSCALE_ALPHA=1
-SOURCE += $(SWSCALE_DIR)/input.c \
+LIBSWSCALE_SOURCE += $(SWSCALE_DIR)/input.c \
 			 $(SWSCALE_DIR)/options.c \
 			 $(SWSCALE_DIR)/output.c \
 			 $(SWSCALE_DIR)/rgb2rgb.c \
@@ -1029,19 +1251,19 @@ SOURCE += $(SWSCALE_DIR)/input.c \
 			 $(SWSCALE_DIR)/yuv2rgb.c
 
 ifeq ($(ARCH_X86),1)
-			 SOURCE += $(SWSCALE_DIR)/x86/rgb2rgb.c \
+			 LIBSWSCALE_SOURCE += $(SWSCALE_DIR)/x86/rgb2rgb.c \
 				 			$(SWSCALE_DIR)/x86/swscale.c \
 							$(SWSCALE_DIR)/x86/yuv2rgb.c
 endif
 
 ifeq ($(ARCH_ARM),1)
-			 SOURCE += $(SWSCALE_DIR)/arm/swscale_unscaled.c
+			 LIBSWSCALE_SOURCE += $(SWSCALE_DIR)/arm/swscale_unscaled.c
 endif
 endif
 
 #libswresample
 ifeq ($(INTERNAL_LIBSWRESAMPLE),1)
-SOURCE += $(SWRESAMPLE_DIR)/audioconvert.c \
+LIBSWRESAMPLE_SOURCE += $(SWRESAMPLE_DIR)/audioconvert.c \
 			 $(SWRESAMPLE_DIR)/dither.c \
 			 $(SWRESAMPLE_DIR)/rematrix.c \
 			 $(SWRESAMPLE_DIR)/resample.c \
@@ -1075,21 +1297,21 @@ AVFORMAT_BLACKLIST := \
 	$(AVFORMAT_DIR)/sctp.c
 
 ifneq ($(INTERNAL_LIBAVCODEC),1)
-SOURCE += $(AVCODEC_DIR)/exif.c $(AVCODEC_DIR)/tiff_common.c $(AVCODEC_DIR)/raw.c
+LIBAVFORMAT_SOURCE += $(AVCODEC_DIR)/exif.c $(AVCODEC_DIR)/tiff_common.c $(AVCODEC_DIR)/raw.c
 endif
 
 ifneq ($(HAVE_POLL_H),1)
 AVFORMAT_BLACKLIST += $(AVFORMAT_DIR)/sapdec.c
 endif
 
-SOURCE += $(filter-out $(AVFORMAT_BLACKLIST),$(wildcard $(AVFORMAT_DIR)/*.c))
+LIBAVFORMAT_SOURCE += $(filter-out $(AVFORMAT_BLACKLIST),$(wildcard $(AVFORMAT_DIR)/*.c))
 endif
 
 #libavcodec
 ifeq ($(INTERNAL_LIBAVCODEC),1)
-CFLAGS += -DHAVE_AVCODEC_H
+CFLAGS += -DHAVE_AVCODEC_H -DCONFIG_ENCODERS=1 -DCONFIG_DECODERS=1
 CFLAGS += -DCONFIG_MDCT=1 -DCONFIG_RDFT=1 -DCONFIG_RUNTIME_CPUDETECT=1 -DCONFIG_GRAY=1 -DCONFIG_XVMC=0 -DCONFIG_DSPUTIL=1 -DCONFIG_FRAME_THREAD_ENCODER=1
-CFLAGS += -DHAVE_MIPSDSPR1=0 -DCONFIG_ERROR_RESILIENCE=1 -DCONFIG_MPEGVIDEO=1 -DCONFIG_MPEGVIDEOENC=1 -DCONFIG_LIBSHINE=0 -DCONFIG_GOLOMB=1
+CFLAGS +=  -DCONFIG_ERROR_RESILIENCE=1 -DCONFIG_MPEGVIDEO=1 -DCONFIG_MPEGVIDEOENC=1 -DCONFIG_LIBSHINE=0 -DCONFIG_GOLOMB=1
 
 
 AVCODEC_BLACKLIST := \
@@ -1143,17 +1365,64 @@ AVCODEC_BLACKLIST := \
 	$(AVCODEC_DIR)/hevcpred_template.c \
 	$(AVCODEC_DIR)/libtwolame.c \
 	$(AVCODEC_DIR)/libxavs.c \
+	$(AVCODEC_DIR)/libzvbi-teletextdec.c \
 	$(AVCODEC_DIR)/libilbc.c \
 	$(AVCODEC_DIR)/crystalhd.c \
 	$(AVCODEC_DIR)/vda_h264.c \
 	$(AVCODEC_DIR)/vda_h264_dec.c \
+	$(AVCODEC_DIR)/x86/rnd_template.c \
+	$(AVCODEC_DIR)/x86/dsputil_qns_template.c \
+	$(AVCODEC_DIR)/x86/mpegvideoenc_template.c \
+	$(AVCODEC_DIR)/x86/hpeldsp_rnd_template.c \
+	$(AVCODEC_DIR)/x86/w64xmmtest.c \
 	$(AVCODEC_DIR)/dct-test.c
 
-ifeq ($(HAVE_OPUS),0)
+ifeq ($(HAVE_LIBWEBP),0)
+	AVCODEC_BLACKLIST += $(AVCODEC_DIR)/libwebpenc.c
+endif
+
+ifeq ($(HAVE_LIBFAAC),0)
+	AVCODEC_BLACKLIST += $(AVCODEC_DIR)/libfaac.c
+endif
+ifeq ($(HAVE_LIBVORBIS),0)
+	AVCODEC_BLACKLIST += \
+								$(AVCODEC_DIR)/libvorbisenc.c \
+								$(AVCODEC_DIR)/libvorbisdec.c
+endif
+ifeq ($(HAVE_LIBLAME),0)
+	AVCODEC_BLACKLIST += \
+								$(AVCODEC_DIR)/liblame.c \
+								$(AVCODEC_DIR)/libmp3lame.c
+endif
+
+ifeq ($(HAVE_LIBX264),0)
+	AVCODEC_BLACKLIST += $(AVCODEC_DIR)/libx264.c
+endif
+
+ifeq ($(HAVE_LIBX265),0)
+	AVCODEC_BLACKLIST += $(AVCODEC_DIR)/libx265.c
+endif
+
+ifeq ($(HAVE_LIBSPEEX),0)
+	AVCODEC_BLACKLIST += \
+								$(AVCODEC_DIR)/libspeexenc.c \
+								$(AVCODEC_DIR)/libspeexdec.c
+endif
+
+ifeq ($(HAVE_LIBOPUS),0)
 	AVCODEC_BLACKLIST += \
 								$(AVCODEC_DIR)/libopusenc.c \
 								$(AVCODEC_DIR)/libopusdec.c \
 								$(AVCODEC_DIR)/libopus.c
+endif
+
+ifeq ($(HAVE_LIBTHEORA),0)
+	AVCODEC_BLACKLIST += \
+								$(AVCODEC_DIR)/libtheoraenc.c
+endif
+
+ifeq ($(INTERNAL_LIBAVUTIL),1)
+	AVCODEC_BLACKLIST += $(AVCODEC_DIR)/file_open.c
 endif
 
 #Codec HW Acceleration flags - all disabled for now - not sure if 
@@ -1176,12 +1445,18 @@ CFLAGS += -DCONFIG_H263_VAAPI_HWACCEL=1 \
 			 -DCONFIG_MPEG2_VDPAU_HWACCEL=1 \
 			 -DCONFIG_MPEG4_VAAPI_HWACCEL=1 \
 			 -DCONFIG_MPEG4_VDPAU_HWACCEL=1 \
+			 -DCONFIG_VC1_VDPAU_DECODER=1 \
 			 -DCONFIG_VC1_DXVA2_HWACCEL=1 \
 			 -DCONFIG_VC1_VAAPI_HWACCEL=1 \
 			 -DCONFIG_VC1_VDPAU_HWACCEL=1 \
 			 -DCONFIG_WMV3_DXVA2_HWACCEL=1 \
 			 -DCONFIG_WMV3_VAAPI_HWACCEL=1 \
-			 -DCONFIG_WMV3_VDPAU_HWACCEL=1
+			 -DCONFIG_WMV3_VDPAU_HWACCEL=1 \
+			 -DCONFIG_WMV3_VDPAU_DECODER=1 \
+			 -DCONFIG_H264_VDPAU_DECODER=1 \
+			 -DCONFIG_MPEG4_VDPAU_DECODER=1 \
+			 -DCONFIG_MPEG_VDPAU_DECODER=1 \
+			 -DCONFIG_MPEG1_VDPAU_DECODER=1
 else
 CFLAGS += -DCONFIG_H263_VAAPI_HWACCEL=0 \
 			 -DCONFIG_H263_VDPAU_HWACCEL=0 \
@@ -1199,12 +1474,19 @@ CFLAGS += -DCONFIG_H263_VAAPI_HWACCEL=0 \
 			 -DCONFIG_MPEG2_VDPAU_HWACCEL=0 \
 			 -DCONFIG_MPEG4_VAAPI_HWACCEL=0 \
 			 -DCONFIG_MPEG4_VDPAU_HWACCEL=0 \
+			 -DCONFIG_VC1_VDPAU_DECODER=0 \
 			 -DCONFIG_VC1_DXVA2_HWACCEL=0 \
 			 -DCONFIG_VC1_VAAPI_HWACCEL=0 \
 			 -DCONFIG_VC1_VDPAU_HWACCEL=0 \
 			 -DCONFIG_WMV3_DXVA2_HWACCEL=0 \
 			 -DCONFIG_WMV3_VAAPI_HWACCEL=0 \
-			 -DCONFIG_WMV3_VDPAU_HWACCEL=0
+			 -DCONFIG_WMV3_VDPAU_HWACCEL=0 \
+			 -DCONFIG_WMV3_VDPAU_DECODER=0 \
+			 -DCONFIG_H264_VDPAU_DECODER=0 \
+			 -DCONFIG_MPEG4_VDPAU_DECODER=0 \
+			 -DCONFIG_MPEG_VDPAU_DECODER=0 \
+			 -DCONFIG_MPEG1_VDPAU_DECODER=0 
+
 AVCODEC_BLACKLIST += \
 							$(AVCODEC_DIR)/vdpau.c \
 							$(AVCODEC_DIR)/vdpau_vc1.c \
@@ -1217,15 +1499,16 @@ AVCODEC_BLACKLIST += \
 							$(AVCODEC_DIR)/dxva2_h264.c \
 							$(AVCODEC_DIR)/vaapi_h264.c \
 							$(AVCODEC_DIR)/vaapi_mpeg.c \
+							$(AVCODEC_DIR)/vaapi_mpeg2.c \
 							$(AVCODEC_DIR)/vaapi_vc1.c \
 							$(AVCODEC_DIR)/dxa.c \
 							$(AVCODEC_DIR)/vaapi.c
 endif
 
-SOURCE += $(filter-out $(AVCODEC_BLACKLIST),$(wildcard $(AVCODEC_DIR)/*.c))
+LIBAVCODEC_SOURCE += $(filter-out $(AVCODEC_BLACKLIST),$(wildcard $(AVCODEC_DIR)/*.c))
 
 ifeq ($(ARCH_X86),1)
-			 SOURCE += $(filter-out $(AVCODEC_BLACKLIST),$(wildcard $(AVCODEC_DIR)/x86/*.c))
+LIBAVCODEC_SOURCE += $(filter-out $(AVCODEC_BLACKLIST),$(wildcard $(AVCODEC_DIR)/x86/*.c))
 endif
 endif
 
@@ -1246,7 +1529,6 @@ CFLAGS += \
 			 -DCONFIG_DVBSUB_PARSER=1 \
 			 -DCONFIG_DVDSUB_PARSER=1 \
 			 -DCONFIG_DVD_NAV_PARSER=1 \
-			 -DCONFIG_FLAC_PARSER=1 \
 			 -DCONFIG_GSM_PARSER=1 \
 			 -DCONFIG_H261_PARSER=1 \
 			 -DCONFIG_H263_PARSER=1 \
@@ -1263,7 +1545,6 @@ CFLAGS += \
 			 -DCONFIG_RV40_PARSER=1 \
 			 -DCONFIG_TAK_PARSER=1 \
 			 -DCONFIG_VC1_PARSER=1 \
-			 -DCONFIG_VORBIS_PARSER=1 \
 			 -DCONFIG_VP3_PARSER=1 \
 			 -DCONFIG_VP8_PARSER=1 \
 			 -DCONFIG_VP9_PARSER=1
@@ -1315,7 +1596,6 @@ CFLAGS += -DCONFIG_A64_MUXER=1 \
 			 -DCONFIG_FFM_MUXER=1 \
 			 -DCONFIG_FFMETADATA_MUXER=1 \
 			 -DCONFIG_FILMSTRIP_MUXER=1 \
-			 -DCONFIG_FLAC_MUXER=1 \
 			 -DCONFIG_FLV_MUXER=1 \
 			 -DCONFIG_FRAMECRC_MUXER=1 \
 			 -DCONFIG_FRAMEMD5_MUXER=1 \
@@ -1365,7 +1645,6 @@ CFLAGS += -DCONFIG_A64_MUXER=1 \
 			 -DCONFIG_LIBNUT_MUXER=0 \
 			 -DCONFIG_NULL_MUXER=1 \
 			 -DCONFIG_NUT_MUXER=1 \
-			 -DCONFIG_OGG_MUXER=1 \
 			 -DCONFIG_OMA_MUXER=1 \
 			 -DCONFIG_PCM_ALAW_MUXER=1 \
 			 -DCONFIG_PCM_MULAW_MUXER=1 \
@@ -1410,7 +1689,6 @@ CFLAGS += -DCONFIG_A64_MUXER=1 \
 			 -DCONFIG_MKVTIMESTAMP_V2_MUXER=1 \
 			 -DCONFIG_TRUEHD_MUXER=1 \
 			 -DCONFIG_VC1_MUXER=1 \
-			 -DCONFIG_SPEEX_MUXER=1 \
 			 -DCONFIG_VC1T_MUXER=1 \
 			 -DCONFIG_VOC_MUXER=1 \
 			 -DCONFIG_UNCODEDFRAMECRC_MUXER=1 \
@@ -1422,6 +1700,24 @@ CFLAGS += -DCONFIG_A64_MUXER=1 \
 			 -DCONFIG_WV_MUXER=1 \
 			 -DCONFIG_YUV4MPEGPIPE_MUXER=1 \
 			 -DCONFIG_LIBNUT_MUXER=0
+
+ifeq ($(HAVE_LIBOGG),1)
+CFLAGS += -DCONFIG_OGG_MUXER=1
+else
+CFLAGS += -DCONFIG_OGG_MUXER=0
+endif
+
+ifeq ($(HAVE_LIBFLAC),1)
+CFLAGS += -DCONFIG_FLAC_MUXER=1
+else
+CFLAGS += -DCONFIG_FLAC_MUXER=0
+endif
+
+ifeq ($(HAVE_LIBSPEEX),1)
+CFLAGS += -DCONFIG_SPEEX_MUXER=1
+else
+CFLAGS += -DCONFIG_SPEEX_MUXER=0
+endif
 
 CFLAGS += -DCONFIG_AAC_DEMUXER=1 \
 			 -DCONFIG_AC3_DEMUXER=1 \
@@ -1471,7 +1767,7 @@ CFLAGS += -DCONFIG_AAC_DEMUXER=1 \
 			 -DCONFIG_DTS_DEMUXER=1 \
 			 -DCONFIG_DTSHD_DEMUXER=1 \
 			 -DCONFIG_DV_DEMUXER=1 \
-			 -DCONFIG_DXA_DEMUXER=1 \
+			 -DCONFIG_DXA_DEMUXER=0 \
 			 -DCONFIG_EA_DEMUXER=1 \
 			 -DCONFIG_EA_CDATA_DEMUXER=1 \
 			 -DCONFIG_EAC3_DEMUXER=1 \
@@ -1479,7 +1775,6 @@ CFLAGS += -DCONFIG_AAC_DEMUXER=1 \
 			 -DCONFIG_FFM_DEMUXER=1 \
 			 -DCONFIG_FFMETADATA_DEMUXER=1 \
 			 -DCONFIG_FILMSTRIP_DEMUXER=1 \
-			 -DCONFIG_FLAC_DEMUXER=1 \
 			 -DCONFIG_IMAGE2_ALIAS_PIX_DEMUXER=1 \
 			 -DCONFIG_IMAGE2_BRENDER_PIX_DEMUXER=1 \
 			 -DCONFIG_FLIC_DEMUXER=1 \
@@ -1548,7 +1843,6 @@ CFLAGS += -DCONFIG_AAC_DEMUXER=1 \
 			 -DCONFIG_NSV_DEMUXER=1 \
 			 -DCONFIG_NUT_DEMUXER=1 \
 			 -DCONFIG_NUV_DEMUXER=1 \
-			 -DCONFIG_OGG_DEMUXER=1 \
 			 -DCONFIG_OMA_DEMUXER=1 \
 			 -DCONFIG_PAF_DEMUXER=1 \
 			 -DCONFIG_PCM_ALAW_DEMUXER=1 \
@@ -1641,6 +1935,19 @@ CFLAGS += -DCONFIG_AAC_DEMUXER=1 \
 			 -DCONFIG_LIBMODPLUG_DEMUXER=0 \
 			 -DCONFIG_LIBNUT_DEMUXER=0 \
 			 -DCONFIG_LIBQUVI_DEMUXER=0
+
+ifeq ($(HAVE_LIBOGG),1)
+CFLAGS += -DCONFIG_OGG_DEMUXER=1
+else
+CFLAGS += -DCONFIG_OGG_DEMUXER=0
+endif
+
+ifeq ($(HAVE_LIBFLAC),1)
+CFLAGS += -DCONFIG_FLAC_DEMUXER=1
+else
+CFLAGS += -DCONFIG_FLAC_DEMUXER=1
+endif
+
 endif
 
 CFLAGS += -Wall -std=gnu99 -pedantic $(fpic)
@@ -1658,10 +1965,10 @@ ifeq ($(HAVE_GL), 1)
    else
       LIBS += $(GL_LIB)
    endif
-   SOURCE += glsym.c
+   LIBRETRO_SOURCE += glsym.c
 endif
 
-OBJECTS := $(SOURCE:.c=.o)
+OBJECTS := $(LIBRETRO_SOURCE:.c=.o) $(LIBAVUTIL_SOURCE:.c=.o) $(LIBAVFORMAT_SOURCE:.c=.o) $(LIBSWSCALE_SOURCE:.c=.o) $(LIBAVCODEC_SOURCE:.c=.o) $(LIBSWRESAMPLE_SOURCE:.c=.o)
 
 all: $(TARGET)
 
