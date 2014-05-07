@@ -1,0 +1,4 @@
+#ifndef _LIBRETRO_AVCONFIG_H
+#define _LIBRETRO_AVCONFIG_H
+
+#endif /* _LIBRETRO_AVCONFIG_H */
