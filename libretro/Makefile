@@ -12,6 +12,7 @@ INTERNAL_LIBLAME       = 0
 INTERNAL_LIBFAAC       = 0
 INTERNAL_LIBSPEEX      = 0
 INTERNAL_LIBTHEORA     = 0
+INTERNAL_LIBOPUS       = 0  
 INTERNAL_LIBVORBIS     = 0
 INTERNAL_WEBP          = 0
 INTERNAL_ZLIB          = 0
@@ -261,6 +262,15 @@ endif
 ifeq ($(INTERNAL_LIBFLAC),0)
 	LIBS += -lFLAC
 	HAVE_LIBFLAC = 1
+endif
+
+ifeq ($(INTERNAL_LIBOPUS),0)
+	#LIBS += -lopus
+	#HAVE_LIBOPUS = 1
+else
+	#CFLAGS += -I. -Ilibopus -Ilibopus/celt -DUSE_ALLOCA -DOPUS_BUILD
+	#HAVE_LIBOPUS = 1
+	#DEPS_SOURCE += $(wildcard libopus/*.c) $(wildcard libopus/celt/*.c)
 endif
 
 ifeq ($(INTERNAL_LIBVORBIS),0)
