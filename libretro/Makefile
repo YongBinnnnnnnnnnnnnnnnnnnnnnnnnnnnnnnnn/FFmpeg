@@ -17,7 +17,7 @@ INTERNAL_WAVPACK       = 0
 INTERNAL_XVIDCORE      = 0
 INTERNAL_VPX           = 0
 
-LIBRETRO_SWITCH        = 0
+LIBRETRO_SWITCH        = 1
 
 ifeq ($(LIBRETRO_SWITCH),1)
 INTERNAL_LIBAVCODEC    = 1
@@ -27,6 +27,7 @@ INTERNAL_LIBSWRESAMPLE = 1
 INTERNAL_LIBSWSCALE    = 1
 
 INTERNAL_LIBOGG        = 1
+INTERNAL_LIBFAAC       = 1
 INTERNAL_LIBVORBIS     = 1
 INTERNAL_ZLIB          = 1
 endif
@@ -296,6 +297,9 @@ endif
 ifeq ($(INTERNAL_LIBFAAC),0)
 	LIBS += -lfaac
 	HAVE_LIBFAAC = 1
+else
+	HAVE_LIBFAAC = 1
+	DEPS_SOURCE += $(wildcard libfaac/*.c)
 endif
 
 ifeq ($(INTERNAL_WAVPACK),0)
