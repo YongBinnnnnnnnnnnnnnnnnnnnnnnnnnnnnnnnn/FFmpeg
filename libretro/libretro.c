@@ -23,6 +23,8 @@
 #include "glsym.h"
 #endif
 
+static bool reset_triggered;
+
 retro_log_printf_t log_cb;
 static retro_video_refresh_t video_cb;
 static retro_audio_sample_t audio_cb;
@@ -155,6 +157,8 @@ static void append_attachment(const uint8_t *data, size_t size)
 
 void retro_init(void)
 {
+   reset_triggered = false;
+
    av_register_all();
    //avdevice_register_all(); // FIXME: Occasionally crashes inside libavdevice for some odd reason on reentrancy. Likely a libavdevice bug.
 }
@@ -242,8 +246,11 @@ void retro_set_video_refresh(retro_video_refresh_t cb)
    video_cb = cb;
 }
 
+
 void retro_reset(void)
-{}
+{
+   reset_triggered = true;
+}
 
 static void check_variables(void)
 {
@@ -280,6 +287,42 @@ static void check_variables(void)
          colorspace = AVCOL_SPC_UNSPECIFIED;
       slock_unlock(decode_thread_lock);
    }
+}
+
+static void seek_frame(int seek_frames)
+{
+   if ((seek_frames < 0 && (unsigned)-seek_frames > frame_cnt) || reset_triggered)
+      frame_cnt = 0;
+   else
+      frame_cnt += seek_frames;
+
+   slock_lock(fifo_lock);
+
+   do_seek = true;
+   seek_time = frame_cnt / media.interpolate_fps;
+
+   char msg[256];
+   snprintf(msg, sizeof(msg), "Seek: %u s.", (unsigned)seek_time);
+   environ_cb(RETRO_ENVIRONMENT_SET_MESSAGE, &(struct retro_message) { .msg = msg, .frames = 180 });
+
+   if (seek_frames < 0)
+   {
+      if (log_cb)
+         log_cb(RETRO_LOG_INFO, "Resetting PTS.\n");
+      frames[0].pts = 0.0;
+      frames[1].pts = 0.0;
+   }
+   audio_frames = frame_cnt * media.sample_rate / media.interpolate_fps;
+
+   if (video_decode_fifo)
+      fifo_clear(video_decode_fifo);
+   if (audio_decode_fifo)
+      fifo_clear(audio_decode_fifo);
+   scond_signal(fifo_decode_cond);
+
+   while (!decode_thread_dead && do_seek)
+      scond_wait(fifo_cond, fifo_lock);
+   slock_unlock(fifo_lock);
 }
 
 void retro_run(void)
@@ -347,43 +390,17 @@ void retro_run(void)
    last_l = l;
    last_r = r;
 
+   if (reset_triggered)
+   {
+      seek_frames = -1;
+      seek_frame(seek_frames);
+      reset_triggered = false;
+   }
+
    // Push seek request to thread,
    // wait for seek to complete.
    if (seek_frames)
-   {
-      if (seek_frames < 0 && (unsigned)-seek_frames > frame_cnt)
-         frame_cnt = 0;
-      else
-         frame_cnt += seek_frames;
-
-      slock_lock(fifo_lock);
-
-      do_seek = true;
-      seek_time = frame_cnt / media.interpolate_fps;
-
-      char msg[256];
-      snprintf(msg, sizeof(msg), "Seek: %u s.", (unsigned)seek_time);
-      environ_cb(RETRO_ENVIRONMENT_SET_MESSAGE, &(struct retro_message) { .msg = msg, .frames = 180 });
-
-      if (seek_frames < 0)
-      {
-         if (log_cb)
-            log_cb(RETRO_LOG_INFO, "Resetting PTS.\n");
-         frames[0].pts = 0.0;
-         frames[1].pts = 0.0;
-      }
-      audio_frames = frame_cnt * media.sample_rate / media.interpolate_fps;
-
-      if (video_decode_fifo)
-         fifo_clear(video_decode_fifo);
-      if (audio_decode_fifo)
-         fifo_clear(audio_decode_fifo);
-      scond_signal(fifo_decode_cond);
-
-      while (!decode_thread_dead && do_seek)
-         scond_wait(fifo_cond, fifo_lock);
-      slock_unlock(fifo_lock);
-   }
+      seek_frame(seek_frames);
 
    if (decode_thread_dead)
    {
