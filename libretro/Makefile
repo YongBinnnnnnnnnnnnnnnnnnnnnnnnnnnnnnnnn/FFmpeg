@@ -282,9 +282,9 @@ ifeq ($(INTERNAL_LIBVORBIS),0)
 	LIBS += -lvorbis -lvorbisenc -lvorbisfile
 	HAVE_LIBVORBIS = 1
 else
-	CFLAGS += -DOV_EXCLUDE_STATIC_CALLBACKS -Ilibvorbis
+	CFLAGS += -DOV_EXCLUDE_STATIC_CALLBACKS -Ivorbis
 	HAVE_LIBVORBIS = 1
-	DEPS_SOURCE += $(wildcard libvorbis/*.c)
+	DEPS_SOURCE += $(wildcard vorbis/*.c)
 endif
 
 ifeq ($(INTERNAL_LIBLAME),0)
@@ -312,7 +312,7 @@ ifeq ($(INTERNAL_LIBOGG),0)
 else
 	CFLAGS += -DOV_EXCLUDE_STATIC_CALLBACKS
 	HAVE_LIBOGG = 1
-	DEPS_SOURCE += libogg/bitwise.c libogg/framing.c
+	DEPS_SOURCE += ogg/bitwise.c ogg/framing.c
 endif
 
 ifeq ($(INTERNAL_LIBFAAC),0)
