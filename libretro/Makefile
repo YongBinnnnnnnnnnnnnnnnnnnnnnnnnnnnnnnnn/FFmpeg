@@ -319,6 +319,7 @@ ifeq ($(INTERNAL_LIBFAAC),0)
 	LIBS += -lfaac
 	HAVE_LIBFAAC = 1
 else
+	CFLAGS += -Ilibfaac
 	HAVE_LIBFAAC = 1
 	DEPS_SOURCE += $(wildcard libfaac/*.c)
 endif
