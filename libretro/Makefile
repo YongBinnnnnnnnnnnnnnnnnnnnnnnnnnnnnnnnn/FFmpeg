@@ -1466,7 +1466,6 @@ AVCODEC_BLACKLIST := \
 	$(AVCODEC_DIR)/h264_mb_template.c \
 	$(AVCODEC_DIR)/mpegaudiodec_template.c \
 	$(AVCODEC_DIR)/hevcdsp_template.c \
-	$(AVCODEC_DIR)/x86/hevcdsp_init.c \
 	$(AVCODEC_DIR)/libshine.c \
 	$(AVCODEC_DIR)/h264_mc_template.c \
 	$(AVCODEC_DIR)/h264qpel_template.c \
