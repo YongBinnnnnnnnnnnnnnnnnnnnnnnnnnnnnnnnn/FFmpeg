@@ -110,6 +110,11 @@ MAKE_ACCESSORS(AVFormatContext, format, int, metadata_header_padding)
 MAKE_ACCESSORS(AVFormatContext, format, void *, opaque)
 MAKE_ACCESSORS(AVFormatContext, format, av_format_control_message, control_message_cb)
 
+int64_t av_stream_get_end_pts(const AVStream *st)
+{
+    return st->pts.val;
+}
+
 void av_format_inject_global_side_data(AVFormatContext *s)
 {
     int i;
@@ -4664,4 +4669,19 @@ int ff_generate_avci_extradata(AVStream *st)
     memcpy(st->codec->extradata, data, size);
 
     return 0;
+}
+
+uint8_t *av_stream_get_side_data(AVStream *st, enum AVPacketSideDataType type,
+                                 int *size)
+{
+    int i;
+
+    for (i = 0; i < st->nb_side_data; i++) {
+        if (st->side_data[i].type == type) {
+            if (size)
+                *size = st->side_data[i].size;
+            return st->side_data[i].data;
+        }
+    }
+    return NULL;
 }

@@ -50,13 +50,11 @@ OBJS-$(CONFIG_VP9_DECODER)             += x86/vp9dsp_init.o
 OBJS-$(CONFIG_WEBP_DECODER)            += x86/vp8dsp_init.o
 
 MMX-OBJS-$(CONFIG_DSPUTIL)             += x86/dsputil_mmx.o             \
-                                          x86/fpel_mmx.o                \
                                           x86/idct_mmx_xvid.o           \
                                           x86/idct_sse2_xvid.o          \
                                           x86/simple_idct.o
 MMX-OBJS-$(CONFIG_DIRAC_DECODER)       += x86/dirac_dwt.o
-MMX-OBJS-$(CONFIG_HPELDSP)             += x86/fpel_mmx.o                \
-                                          x86/hpeldsp_mmx.o
+MMX-OBJS-$(CONFIG_HPELDSP)             += x86/hpeldsp_mmx.o
 
 MMX-OBJS-$(CONFIG_SNOW_DECODER)        += x86/snowdsp.o
 MMX-OBJS-$(CONFIG_SNOW_ENCODER)        += x86/snowdsp.o
@@ -92,7 +90,8 @@ YASM-OBJS-$(CONFIG_H264QPEL)           += x86/h264_qpel_8bit.o          \
                                           x86/h264_qpel_10bit.o         \
                                           x86/fpel.o                    \
                                           x86/qpel.o
-YASM-OBJS-$(CONFIG_HEVC_DECODER)       += x86/hevc_mc.o
+YASM-OBJS-$(CONFIG_HEVC_DECODER)       += x86/hevc_mc.o                 \
+                                          x86/hevc_deblock.o
 YASM-OBJS-$(CONFIG_HPELDSP)            += x86/fpel.o                    \
                                           x86/hpeldsp.o
 YASM-OBJS-$(CONFIG_LLVIDDSP)           += x86/lossless_videodsp.o
