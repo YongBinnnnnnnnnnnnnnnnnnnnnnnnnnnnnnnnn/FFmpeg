@@ -25,6 +25,7 @@
 #include "libavutil/avassert.h"
 #include "libavutil/channel_layout.h"
 #include "libavutil/opt.h"
+#include "lossless_audiodsp.h"
 #include "avcodec.h"
 #include "dsputil.h"
 #include "bytestream.h"
@@ -136,6 +137,7 @@ typedef struct APEContext {
     AVClass *class;                          ///< class for AVOptions
     AVCodecContext *avctx;
     DSPContext dsp;
+    LLAudDSPContext adsp;
     int channels;
     int samples;                             ///< samples left to decode in current frame
     int bps;
@@ -194,8 +196,6 @@ static void predictor_decode_mono_3930(APEContext *ctx, int count);
 static void predictor_decode_stereo_3930(APEContext *ctx, int count);
 static void predictor_decode_mono_3950(APEContext *ctx, int count);
 static void predictor_decode_stereo_3950(APEContext *ctx, int count);
-
-// TODO: dsputilize
 
 static av_cold int ape_decode_close(AVCodecContext *avctx)
 {
@@ -294,6 +294,7 @@ static av_cold int ape_decode_init(AVCodecContext *avctx)
     }
 
     ff_dsputil_init(&s->dsp, avctx);
+    ff_llauddsp_init(&s->adsp);
     avctx->channel_layout = (avctx->channels==2) ? AV_CH_LAYOUT_STEREO : AV_CH_LAYOUT_MONO;
 
     return 0;
@@ -1275,9 +1276,10 @@ static void do_apply_filter(APEContext *ctx, int version, APEFilter *f,
 
     while (count--) {
         /* round fixedpoint scalar product */
-        res = ctx->dsp.scalarproduct_and_madd_int16(f->coeffs, f->delay - order,
-                                                    f->adaptcoeffs - order,
-                                                    order, APESIGN(*data));
+        res = ctx->adsp.scalarproduct_and_madd_int16(f->coeffs,
+                                                     f->delay - order,
+                                                     f->adaptcoeffs - order,
+                                                     order, APESIGN(*data));
         res = (res + (1 << (fracbits - 1))) >> fracbits;
         res += *data;
         *data++ = res;

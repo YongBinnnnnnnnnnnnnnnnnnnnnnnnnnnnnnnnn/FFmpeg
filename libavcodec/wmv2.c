@@ -129,28 +129,20 @@ void ff_mspel_motion(MpegEncContext *s,
         emu=1;
     }
 
-    s->dsp.put_mspel_pixels_tab[dxy](dest_y             , ptr             , linesize);
-    s->dsp.put_mspel_pixels_tab[dxy](dest_y+8           , ptr+8           , linesize);
-    s->dsp.put_mspel_pixels_tab[dxy](dest_y  +8*linesize, ptr  +8*linesize, linesize);
-    s->dsp.put_mspel_pixels_tab[dxy](dest_y+8+8*linesize, ptr+8+8*linesize, linesize);
+    w->wdsp.put_mspel_pixels_tab[dxy](dest_y,                    ptr,                    linesize);
+    w->wdsp.put_mspel_pixels_tab[dxy](dest_y     + 8,            ptr     + 8,            linesize);
+    w->wdsp.put_mspel_pixels_tab[dxy](dest_y     + 8 * linesize, ptr     + 8 * linesize, linesize);
+    w->wdsp.put_mspel_pixels_tab[dxy](dest_y + 8 + 8 * linesize, ptr + 8 + 8 * linesize, linesize);
 
     if(s->flags&CODEC_FLAG_GRAY) return;
 
-    if (s->out_format == FMT_H263) {
-        dxy = 0;
-        if ((motion_x & 3) != 0)
-            dxy |= 1;
-        if ((motion_y & 3) != 0)
-            dxy |= 2;
-        mx = motion_x >> 2;
-        my = motion_y >> 2;
-    } else {
-        mx = motion_x / 2;
-        my = motion_y / 2;
-        dxy = ((my & 1) << 1) | (mx & 1);
-        mx >>= 1;
-        my >>= 1;
-    }
+    dxy = 0;
+    if ((motion_x & 3) != 0)
+        dxy |= 1;
+    if ((motion_y & 3) != 0)
+        dxy |= 2;
+    mx = motion_x >> 2;
+    my = motion_y >> 2;
 
     src_x = s->mb_x * 8 + mx;
     src_y = s->mb_y * 8 + my;

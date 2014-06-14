@@ -314,6 +314,7 @@ Advanced options (experts only):
                            (faster, but may crash)
   --enable-memalign-hack   emulate memalign, interferes with memory debuggers
   --enable-sram            allow use of on-chip SRAM
+  --sws-max-filter-size=N  the max filter size swscale uses [$sws_max_filter_size_default]
 
 Optimization options (experts only):
   --disable-asm            disable all assembler optimizations
@@ -417,7 +418,7 @@ EOF
     else
         cat <<EOF
 Include the log file "$logfile" produced by configure as this will help
-solving the problem.
+solve the problem.
 EOF
     fi
     exit 1
@@ -443,7 +444,7 @@ sh_quote(){
 }
 
 cleanws(){
-    echo "$@" | sed 's/^ *//;s/  */ /g;s/ *$//;s/\r//g'
+    echo "$@" | sed 's/^ *//;s/  */ /g;s/ *$//;s/\\r//g'
 }
 
 filter(){
@@ -1645,6 +1646,7 @@ MATH_FUNCS="
     exp2
     exp2f
     expf
+    fminf
     isinf
     isnan
     ldexpf
@@ -1718,6 +1720,8 @@ SYSTEM_FUNCS="
 "
 
 TOOLCHAIN_FEATURES="
+    as_dn_directive
+    as_func
     asm_mod_q
     attribute_may_alias
     attribute_packed
@@ -1805,8 +1809,11 @@ CONFIG_EXTRA="
     h264qpel
     hpeldsp
     huffman
+    huffyuvdsp
+    huffyuvencdsp
     intrax8
     lgplv3
+    llauddsp
     llviddsp
     lpc
     mpegaudio
@@ -1814,6 +1821,7 @@ CONFIG_EXTRA="
     mpegvideo
     mpegvideoenc
     nettle
+    qpeldsp
     rangecoder
     riffdec
     riffenc
@@ -1885,6 +1893,7 @@ CMDLINE_SET="
     ranlib
     samples
     strip
+    sws_max_filter_size
     sysinclude
     sysroot
     target_exec
@@ -1985,7 +1994,7 @@ rdft_select="fft"
 mpegaudio_select="mpegaudiodsp"
 mpegaudiodsp_select="dct"
 mpegvideo_select="dsputil h264chroma hpeldsp videodsp"
-mpegvideoenc_select="dsputil mpegvideo"
+mpegvideoenc_select="dsputil mpegvideo qpeldsp"
 
 # decoders / encoders
 aac_decoder_select="mdct sinewin"
@@ -2002,7 +2011,7 @@ amrnb_decoder_select="lsp"
 amrwb_decoder_select="lsp"
 amv_decoder_select="sp5x_decoder exif"
 amv_encoder_select="aandcttables"
-ape_decoder_select="dsputil"
+ape_decoder_select="dsputil llauddsp"
 asv1_decoder_select="dsputil"
 asv1_encoder_select="dsputil"
 asv2_decoder_select="dsputil"
@@ -2014,7 +2023,7 @@ avrn_decoder_select="exif"
 bink_decoder_select="dsputil hpeldsp"
 binkaudio_dct_decoder_select="mdct rdft dct sinewin"
 binkaudio_rdft_decoder_select="mdct rdft sinewin"
-cavs_decoder_select="dsputil golomb h264chroma videodsp"
+cavs_decoder_select="dsputil golomb h264chroma qpeldsp videodsp"
 cllc_decoder_select="dsputil"
 comfortnoise_encoder_select="lpc"
 cook_decoder_select="dsputil mdct sinewin"
@@ -2052,15 +2061,15 @@ g2m_decoder_select="dsputil zlib"
 g729_decoder_select="dsputil"
 h261_decoder_select="error_resilience mpegvideo"
 h261_encoder_select="aandcttables mpegvideoenc"
-h263_decoder_select="error_resilience h263_parser h263dsp mpegvideo"
+h263_decoder_select="error_resilience h263_parser h263dsp mpegvideo qpeldsp"
 h263_encoder_select="aandcttables h263dsp mpegvideoenc"
 h263i_decoder_select="h263_decoder"
 h263p_encoder_select="h263_encoder"
 h264_decoder_select="cabac golomb h264chroma h264dsp h264pred h264qpel videodsp"
 h264_decoder_suggest="error_resilience"
 hevc_decoder_select="cabac dsputil golomb videodsp"
-huffyuv_decoder_select="dsputil llviddsp"
-huffyuv_encoder_select="dsputil huffman llviddsp"
+huffyuv_decoder_select="dsputil huffyuvdsp llviddsp"
+huffyuv_encoder_select="dsputil huffman huffyuvencdsp llviddsp"
 iac_decoder_select="imc_decoder"
 imc_decoder_select="dsputil fft mdct sinewin"
 indeo3_decoder_select="hpeldsp"
@@ -2068,7 +2077,7 @@ interplay_video_decoder_select="hpeldsp"
 jpegls_decoder_select="golomb mjpeg_decoder"
 jpegls_encoder_select="golomb"
 jv_decoder_select="dsputil"
-lagarith_decoder_select="dsputil"
+lagarith_decoder_select="huffyuvdsp"
 ljpeg_encoder_select="aandcttables mpegvideoenc"
 loco_decoder_select="golomb"
 mdec_decoder_select="dsputil error_resilience mpegvideo"
@@ -2104,7 +2113,7 @@ msmpeg4v2_decoder_select="h263_decoder"
 msmpeg4v2_encoder_select="h263_encoder"
 msmpeg4v3_decoder_select="h263_decoder"
 msmpeg4v3_encoder_select="h263_encoder"
-mss2_decoder_select="error_resilience vc1_decoder"
+mss2_decoder_select="error_resilience qpeldsp vc1_decoder"
 mxpeg_decoder_select="mjpeg_decoder"
 nellymoser_decoder_select="mdct sinewin"
 nellymoser_encoder_select="audio_frame_queue mdct sinewin"
@@ -2112,7 +2121,7 @@ nuv_decoder_select="dsputil lzo"
 on2avc_decoder_select="mdct"
 opus_decoder_deps="swresample"
 png_decoder_select="zlib"
-png_encoder_select="dsputil zlib"
+png_encoder_select="huffyuvencdsp zlib"
 prores_decoder_select="dsputil"
 prores_encoder_select="dsputil"
 qcelp_decoder_select="lsp"
@@ -2150,9 +2159,9 @@ truespeech_decoder_select="dsputil"
 tscc_decoder_select="zlib"
 twinvq_decoder_select="mdct lsp sinewin"
 utvideo_decoder_select="dsputil"
-utvideo_encoder_select="dsputil huffman"
-vble_decoder_select="dsputil"
-vc1_decoder_select="error_resilience h263_decoder h264chroma h264qpel intrax8"
+utvideo_encoder_select="dsputil huffman huffyuvencdsp"
+vble_decoder_select="huffyuvdsp"
+vc1_decoder_select="error_resilience h263_decoder h264chroma h264qpel intrax8 qpeldsp"
 vc1image_decoder_select="vc1_decoder"
 vorbis_decoder_select="mdct"
 vorbis_encoder_select="mdct"
@@ -2165,6 +2174,7 @@ vp7_decoder_select="h264pred videodsp"
 vp8_decoder_select="h264pred videodsp"
 vp9_decoder_select="videodsp vp9_parser"
 webp_decoder_select="vp8_decoder"
+wmalossless_decoder_select="llauddsp"
 wmapro_decoder_select="mdct sinewin"
 wmav1_decoder_select="mdct sinewin"
 wmav1_encoder_select="mdct sinewin"
@@ -2256,8 +2266,8 @@ wmv3_vdpau_hwaccel_select="vc1_vdpau_hwaccel"
 # parsers
 h264_parser_select="h264_decoder"
 hevc_parser_select="hevc_decoder"
-mpeg4video_parser_select="error_resilience h263dsp mpegvideo"
 mpegvideo_parser_select="error_resilience mpegvideo"
+mpeg4video_parser_select="error_resilience h263dsp mpegvideo qpeldsp"
 vc1_parser_select="mpegvideo"
 
 # external libraries
@@ -2532,6 +2542,7 @@ pixfmts_super2xsai_test_deps="super2xsai_filter"
 tinterlace_merge_test_deps="tinterlace_filter"
 tinterlace_pad_test_deps="tinterlace_filter"
 zmq_filter_deps="libzmq"
+zoompan_filter_deps="swscale"
 
 # examples
 avio_reading="avformat avcodec avutil"
@@ -2565,7 +2576,7 @@ ffmpeg_select="aformat_filter anull_filter atrim_filter format_filter
                setpts_filter trim_filter"
 ffplay_deps="avcodec avformat swscale swresample sdl"
 ffplay_libs='$sdl_libs'
-ffplay_select="rdft crop_filter"
+ffplay_select="rdft crop_filter transpose_filter hflip_filter vflip_filter rotate_filter"
 ffprobe_deps="avcodec avformat"
 ffserver_deps="avformat fork sarestart"
 ffserver_select="ffm_muxer rtp_protocol rtsp_demuxer"
@@ -2636,6 +2647,9 @@ enable runtime_cpudetect
 enable safe_bitstream_reader
 enable static
 enable swscale_alpha
+
+sws_max_filter_size_default=256
+set_default sws_max_filter_size
 
 # Enable hwaccels by default.
 enable dxva2 vaapi vda vdpau xvmc
@@ -3538,7 +3552,7 @@ case "$arch" in
     tilegx|tile-gx)
         arch="tilegx"
     ;;
-    i[3-6]86|i86pc|BePC|x86pc|x86_64|x86_32|amd64)
+    i[3-6]86*|i86pc|BePC|x86pc|x86_64|x86_32|amd64)
         arch="x86"
     ;;
 esac
@@ -4264,6 +4278,29 @@ unsigned int endian = 'B' << 24 | 'I' << 16 | 'G' << 8 | 'E';
 EOF
 od -t x1 $TMPO | grep -q '42 *49 *47 *45' && enable bigendian
 
+
+if enabled asm; then
+    enabled     arm         && nogas=die
+    enabled_all ppc altivec && nogas=warn
+    as=${gas:=$as}
+    check_as <<EOF && enable gnu_as || \
+        $nogas "GNU assembler not found, install gas-preprocessor"
+.macro m n
+\n: .int 0
+.endm
+m x
+EOF
+
+    check_as <<EOF || $nogas "GNU assembler not found, install gas-preprocessor"
+.altmacro
+EOF
+
+    check_as <<EOF && enable as_func
+.func test
+.endfunc
+EOF
+fi
+
 check_inline_asm inline_asm_labels '"1:\n"'
 
 check_inline_asm inline_asm_nonlocal_labels '"Label:\n"'
@@ -4287,7 +4324,6 @@ float func(float a, float b){ return a+b; }
 EOF
 
     enabled thumb && check_cflags -mthumb || check_cflags -marm
-    nogas=die
 
     if     check_cpp_condition stddef.h "defined __ARM_PCS_VFP"; then
         enable vfp_args
@@ -4314,6 +4350,11 @@ EOF
             $ARCH_EXT_LIST_ARM
 
     check_inline_asm asm_mod_q '"add r0, %Q0, %R0" :: "r"((long long)0)'
+
+    check_as <<EOF && enable as_dn_directive
+ra .dn d0.i16
+.unreq ra
+EOF
 
     [ $target_os != win32 ] && enabled_all armv6t2 shared !pic && enable_weak_pic
 
@@ -4348,9 +4389,6 @@ elif enabled ppc; then
 
     # AltiVec flags: The FSF version of GCC differs from the Apple version
     if enabled altivec; then
-        if ! enabled_any pic ppc64; then
-            nogas=warn
-        fi
         check_cflags -maltivec -mabi=altivec &&
         { check_header altivec.h && inc_altivec_h="#include <altivec.h>" ; } ||
         check_cflags -faltivec
@@ -4434,17 +4472,6 @@ EOF
         ;;
     esac
 
-fi
-
-if enabled asm; then
-    as=${gas:=$as}
-    check_as <<EOF && enable gnu_as || \
-        $nogas "GNU assembler not found, install gas-preprocessor"
-.macro m n
-\n: .int 0
-.endm
-m x
-EOF
 fi
 
 check_ldflags -Wl,--as-needed
@@ -4593,6 +4620,9 @@ if ! disabled pthreads && ! enabled w32threads && ! enabled os2threads; then
     elif check_func pthread_join -pthreads && check_func pthread_create -pthreads; then
         add_cflags -pthreads
         add_extralibs -pthreads
+    elif check_func pthread_join -ldl -pthread && check_func pthread_create -ldl -pthread; then
+        add_cflags -ldl -pthread
+        add_extralibs -ldl -pthread
     elif check_func pthread_join -lpthreadGC2 && check_func pthread_create -lpthreadGC2; then
         add_extralibs -lpthreadGC2
     elif check_lib pthread.h pthread_join -lpthread && check_lib pthread.h pthread_create -lpthread; then
@@ -4617,6 +4647,7 @@ disabled crystalhd || check_lib libcrystalhd/libcrystalhd_if.h DtsCrystalHDVersi
 atan2f_args=2
 ldexpf_args=2
 powf_args=2
+fminf_args=2
 
 for func in $MATH_FUNCS; do
     eval check_mathfunc $func \${${func}_args:-1}
@@ -4696,8 +4727,8 @@ enabled libx264           && require libx264 x264.h x264_encoder_encode -lx264 &
                              { check_cpp_condition x264.h "X264_BUILD >= 118" ||
                                die "ERROR: libx264 must be installed and version must be >= 0.118."; }
 enabled libx265           && require_pkg_config x265 x265.h x265_encoder_encode &&
-                             { check_cpp_condition x265.h "X265_BUILD >= 13" ||
-                               die "ERROR: libx265 version must be >= 13."; }
+                             { check_cpp_condition x265.h "X265_BUILD >= 17" ||
+                               die "ERROR: libx265 version must be >= 17."; }
 enabled libxavs           && require libxavs xavs.h xavs_encoder_encode -lxavs
 enabled libxvid           && require libxvid xvid.h xvid_global -lxvidcore
 enabled libzmq            && require_pkg_config libzmq zmq.h zmq_ctx_new
@@ -5425,6 +5456,7 @@ cat > $TMPH <<EOF
 #define BUILDSUF "$build_suffix"
 #define SLIBSUF "$SLIBSUF"
 #define HAVE_MMX2 HAVE_MMXEXT
+#define SWS_MAX_FILTER_SIZE $sws_max_filter_size
 EOF
 
 test -n "$assert_level" &&

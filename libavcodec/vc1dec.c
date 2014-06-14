@@ -33,6 +33,7 @@
 #include "mpegvideo.h"
 #include "h263.h"
 #include "h264chroma.h"
+#include "qpeldsp.h"
 #include "vc1.h"
 #include "vc1data.h"
 #include "vc1acdata.h"
@@ -5577,7 +5578,7 @@ av_cold void ff_vc1_init_transposed_scantables(VC1Context *v)
 {
     int i;
     for (i = 0; i < 64; i++) {
-#define transpose(x) ((x >> 3) | ((x & 7) << 3))
+#define transpose(x) (((x) >> 3) | (((x) & 7) << 3))
         v->zz_8x8[0][i] = transpose(ff_wmv1_scantable[0][i]);
         v->zz_8x8[1][i] = transpose(ff_wmv1_scantable[1][i]);
         v->zz_8x8[2][i] = transpose(ff_wmv1_scantable[2][i]);
@@ -5624,6 +5625,7 @@ static av_cold int vc1_decode_init(AVCodecContext *avctx)
     ff_vc1_decode_end(avctx);
 
     ff_h264chroma_init(&v->h264chroma, 8);
+    ff_qpeldsp_init(&s->qdsp);
 
     if (avctx->codec_id == AV_CODEC_ID_WMV3 || avctx->codec_id == AV_CODEC_ID_WMV3IMAGE) {
         int count = 0;
@@ -6032,8 +6034,8 @@ static int vc1_decode_frame(AVCodecContext *avctx, void *data,
         s->current_picture_ptr->f->repeat_pict = v->rptfrm * 2;
     }
 
-    s->me.qpel_put = s->dsp.put_qpel_pixels_tab;
-    s->me.qpel_avg = s->dsp.avg_qpel_pixels_tab;
+    s->me.qpel_put = s->qdsp.put_qpel_pixels_tab;
+    s->me.qpel_avg = s->qdsp.avg_qpel_pixels_tab;
 
     if ((CONFIG_VC1_VDPAU_DECODER)
         &&s->avctx->codec->capabilities&CODEC_CAP_HWACCEL_VDPAU) {

@@ -46,6 +46,7 @@
 #include "mpegutils.h"
 #include "mjpegenc.h"
 #include "msmpeg4.h"
+#include "qpeldsp.h"
 #include "faandct.h"
 #include "thread.h"
 #include "aandcttab.h"
@@ -245,7 +246,7 @@ av_cold int ff_dct_encode_init(MpegEncContext *s) {
 av_cold int ff_MPV_encode_init(AVCodecContext *avctx)
 {
     MpegEncContext *s = avctx->priv_data;
-    int i, ret;
+    int i, ret, format_supported;
 
     MPV_encode_defaults(s);
 
@@ -260,13 +261,24 @@ av_cold int ff_MPV_encode_init(AVCodecContext *avctx)
         break;
     case AV_CODEC_ID_MJPEG:
     case AV_CODEC_ID_AMV:
-        if (avctx->pix_fmt != AV_PIX_FMT_YUVJ420P &&
-            avctx->pix_fmt != AV_PIX_FMT_YUVJ422P &&
-            avctx->pix_fmt != AV_PIX_FMT_YUVJ444P &&
-            ((avctx->pix_fmt != AV_PIX_FMT_YUV420P &&
-              avctx->pix_fmt != AV_PIX_FMT_YUV422P &&
-              avctx->pix_fmt != AV_PIX_FMT_YUV444P) ||
-             avctx->strict_std_compliance > FF_COMPLIANCE_UNOFFICIAL)) {
+        format_supported = 0;
+        /* JPEG color space */
+        if (avctx->pix_fmt == AV_PIX_FMT_YUVJ420P ||
+            avctx->pix_fmt == AV_PIX_FMT_YUVJ422P ||
+            avctx->pix_fmt == AV_PIX_FMT_YUVJ444P ||
+            (avctx->color_range == AVCOL_RANGE_JPEG &&
+             (avctx->pix_fmt == AV_PIX_FMT_YUV420P ||
+              avctx->pix_fmt == AV_PIX_FMT_YUV422P ||
+              avctx->pix_fmt == AV_PIX_FMT_YUV444P)))
+            format_supported = 1;
+        /* MPEG color space */
+        else if (avctx->strict_std_compliance <= FF_COMPLIANCE_UNOFFICIAL &&
+                 (avctx->pix_fmt == AV_PIX_FMT_YUV420P ||
+                  avctx->pix_fmt == AV_PIX_FMT_YUV422P ||
+                  avctx->pix_fmt == AV_PIX_FMT_YUV444P))
+            format_supported = 1;
+
+        if (!format_supported) {
             av_log(avctx, AV_LOG_ERROR, "colorspace not supported in jpeg\n");
             return -1;
         }
@@ -803,6 +815,8 @@ av_cold int ff_MPV_encode_init(AVCodecContext *avctx)
     if (ff_MPV_common_init(s) < 0)
         return -1;
 
+    ff_qpeldsp_init(&s->qdsp);
+
     s->avctx->coded_frame = s->current_picture.f;
 
     if (s->msmpeg4_version) {
@@ -1106,10 +1120,11 @@ static int load_input_picture(MpegEncContext *s, const AVFrame *pic_arg)
                     int h = s->height >> v_shift;
                     uint8_t *src = pic_arg->data[i];
                     uint8_t *dst = pic->f->data[i];
+                    int vpad = 16;
 
-                    if (s->codec_id == AV_CODEC_ID_AMV && !(s->avctx->flags & CODEC_FLAG_EMU_EDGE)) {
-                        h = ((s->height + 15)/16*16) >> v_shift;
-                    }
+                    if (   s->codec_id == AV_CODEC_ID_MPEG2VIDEO
+                        && !s->progressive_sequence)
+                        vpad = 32;
 
                     if (!s->avctx->rc_buffer_size)
                         dst += INPLACE_OFFSET;
@@ -1125,11 +1140,11 @@ static int load_input_picture(MpegEncContext *s, const AVFrame *pic_arg)
                             src += src_stride;
                         }
                     }
-                    if ((s->width & 15) || (s->height & 15)) {
+                    if ((s->width & 15) || (s->height & (vpad-1))) {
                         s->dsp.draw_edges(dst, dst_stride,
                                           w, h,
                                           16>>h_shift,
-                                          16>>v_shift,
+                                          vpad>>v_shift,
                                           EDGE_BOTTOM);
                     }
                 }
@@ -1723,7 +1738,9 @@ vbv_retry:
             ff_write_pass1_stats(s);
 
         for (i = 0; i < 4; i++) {
-            s->current_picture_ptr->f->error[i] = s->current_picture.f->error[i];
+            s->current_picture_ptr->f->error[i] =
+            s->current_picture.f->error[i] =
+                s->current_picture.error[i];
             avctx->error[i] += s->current_picture_ptr->f->error[i];
         }
 
@@ -2090,10 +2107,10 @@ static av_always_inline void encode_mb_internal(MpegEncContext *s,
 
         if ((!s->no_rounding) || s->pict_type == AV_PICTURE_TYPE_B) {
             op_pix  = s->hdsp.put_pixels_tab;
-            op_qpix = s->dsp.put_qpel_pixels_tab;
+            op_qpix = s->qdsp.put_qpel_pixels_tab;
         } else {
             op_pix  = s->hdsp.put_no_rnd_pixels_tab;
-            op_qpix = s->dsp.put_no_rnd_qpel_pixels_tab;
+            op_qpix = s->qdsp.put_no_rnd_qpel_pixels_tab;
         }
 
         if (s->mv_dir & MV_DIR_FORWARD) {
@@ -2101,7 +2118,7 @@ static av_always_inline void encode_mb_internal(MpegEncContext *s,
                           s->last_picture.f->data,
                           op_pix, op_qpix);
             op_pix  = s->hdsp.avg_pixels_tab;
-            op_qpix = s->dsp.avg_qpel_pixels_tab;
+            op_qpix = s->qdsp.avg_qpel_pixels_tab;
         }
         if (s->mv_dir & MV_DIR_BACKWARD) {
             ff_MPV_motion(s, dest_y, dest_cb, dest_cr, 1,
@@ -2669,7 +2686,7 @@ static int encode_thread(AVCodecContext *c, void *arg){
         /* note: quant matrix value (8) is implied here */
         s->last_dc[i] = 128 << s->intra_dc_precision;
 
-        s->current_picture.f->error[i] = 0;
+        s->current_picture.error[i] = 0;
     }
     if(s->codec_id==AV_CODEC_ID_AMV){
         s->last_dc[0] = 128*8/13;
@@ -3236,13 +3253,13 @@ static int encode_thread(AVCodecContext *c, void *arg){
                 if(s->mb_x*16 + 16 > s->width ) w= s->width - s->mb_x*16;
                 if(s->mb_y*16 + 16 > s->height) h= s->height- s->mb_y*16;
 
-                s->current_picture.f->error[0] += sse(
+                s->current_picture.error[0] += sse(
                     s, s->new_picture.f->data[0] + s->mb_x*16 + s->mb_y*s->linesize*16,
                     s->dest[0], w, h, s->linesize);
-                s->current_picture.f->error[1] += sse(
+                s->current_picture.error[1] += sse(
                     s, s->new_picture.f->data[1] + s->mb_x*8  + s->mb_y*s->uvlinesize*chr_h,
                     s->dest[1], w>>1, h>>s->chroma_y_shift, s->uvlinesize);
-                s->current_picture.f->error[2] += sse(
+                s->current_picture.error[2] += sse(
                     s, s->new_picture.f->data[2] + s->mb_x*8  + s->mb_y*s->uvlinesize*chr_h,
                     s->dest[2], w>>1, h>>s->chroma_y_shift, s->uvlinesize);
             }
@@ -3295,9 +3312,9 @@ static void merge_context_after_encode(MpegEncContext *dst, MpegEncContext *src)
     MERGE(misc_bits);
     MERGE(er.error_count);
     MERGE(padding_bug_score);
-    MERGE(current_picture.f->error[0]);
-    MERGE(current_picture.f->error[1]);
-    MERGE(current_picture.f->error[2]);
+    MERGE(current_picture.error[0]);
+    MERGE(current_picture.error[1]);
+    MERGE(current_picture.error[2]);
 
     if(dst->avctx->noise_reduction){
         for(i=0; i<64; i++){

@@ -264,6 +264,9 @@ int ff_mjpeg_decode_sof(MJpegDecodeContext *s)
     height = get_bits(&s->gb, 16);
     width  = get_bits(&s->gb, 16);
 
+    if (s->avctx->codec_id == AV_CODEC_ID_AMV && (height&15))
+        avpriv_request_sample(s->avctx, "non mod 16 height AMV\n");
+
     // HACK for odd_height.mov
     if (s->interlaced && s->width == width && s->height == height + 1)
         height= s->height;
@@ -494,9 +497,14 @@ int ff_mjpeg_decode_sof(MJpegDecodeContext *s)
         s->upscale_v = 2 << (pix_fmt_id == 0x22121100);
         break;
     case 0x22111100:
+    case 0x42111100:
         if (s->bits <= 8) s->avctx->pix_fmt = s->cs_itu601 ? AV_PIX_FMT_YUV420P : AV_PIX_FMT_YUVJ420P;
         else              s->avctx->pix_fmt = AV_PIX_FMT_YUV420P16;
         s->avctx->color_range = s->cs_itu601 ? AVCOL_RANGE_MPEG : AVCOL_RANGE_JPEG;
+        if (pix_fmt_id == 0x42111100) {
+            s->upscale_h = 6;
+            s->chroma_height = s->height / 2;
+        }
         break;
     case 0x41111100:
         if (s->bits <= 8) s->avctx->pix_fmt = s->cs_itu601 ? AV_PIX_FMT_YUV411P : AV_PIX_FMT_YUVJ411P;
@@ -1737,7 +1745,7 @@ static int mjpeg_decode_com(MJpegDecodeContext *s)
                 parse_avid(s, cbuf, len);
             } else if (!strcmp(cbuf, "CS=ITU601"))
                 s->cs_itu601 = 1;
-            else if ((!strncmp(cbuf, "Intel(R) JPEG Library, version 1", 32)) ||
+            else if ((!strncmp(cbuf, "Intel(R) JPEG Library, version 1", 32) && s->avctx->codec_tag) ||
                      (!strncmp(cbuf, "Metasoft MJPEG Codec", 20)))
                 s->flipped = 1;
 
@@ -2060,14 +2068,19 @@ the_end:
                    avctx->pix_fmt == AV_PIX_FMT_YUVJ440P ||
                    avctx->pix_fmt == AV_PIX_FMT_YUV440P  ||
                    avctx->pix_fmt == AV_PIX_FMT_YUVA444P ||
+                   avctx->pix_fmt == AV_PIX_FMT_YUVJ420P ||
+                   avctx->pix_fmt == AV_PIX_FMT_YUV420P  ||
                    avctx->pix_fmt == AV_PIX_FMT_GBRAP
                   );
+        avcodec_get_chroma_sub_sample(s->avctx->pix_fmt, &hshift, &vshift);
         for (p = 1; p<4; p++) {
             uint8_t *line = s->picture_ptr->data[p];
+            int w;
             if (!(s->upscale_h & (1<<p)))
                 continue;
+            w = s->width >> hshift;
             for (i = 0; i < s->chroma_height; i++) {
-                for (index = s->width - 1; index; index--)
+                for (index = w - 1; index; index--)
                     line[index] = (line[index / 2] + line[(index + 1) / 2]) >> 1;
                 line += s->linesize[p];
             }

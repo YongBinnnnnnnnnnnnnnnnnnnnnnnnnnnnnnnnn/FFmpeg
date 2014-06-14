@@ -31,6 +31,7 @@
 
 #include "libavutil/attributes.h"
 #include "libavutil/channel_layout.h"
+#include "libavutil/display.h"
 #include "libavutil/intreadwrite.h"
 #include "libavutil/intfloat.h"
 #include "libavutil/mathematics.h"
@@ -221,6 +222,44 @@ static int mov_metadata_raw(MOVContext *c, AVIOContext *pb,
     return av_dict_set(&c->fc->metadata, key, value, AV_DICT_DONT_STRDUP_VAL);
 }
 
+static int mov_metadata_loci(MOVContext *c, AVIOContext *pb, unsigned len)
+{
+    char language[4] = { 0 };
+    char buf[100];
+    uint16_t langcode = 0;
+    av_unused double longitude, latitude, altitude;
+    const char *key = "location";
+
+    if (len < 4 + 2 + 1 + 1 + 4 + 4 + 4)
+        return AVERROR_INVALIDDATA;
+
+    avio_skip(pb, 4); // version+flags
+    langcode = avio_rb16(pb);
+    ff_mov_lang_to_iso639(langcode, language);
+    len -= 6;
+
+    len -= avio_get_str(pb, len, buf, sizeof(buf)); // place name
+    if (len < 1)
+        return AVERROR_INVALIDDATA;
+    avio_skip(pb, 1); // role
+    len -= 1;
+
+    if (len < 14)
+        return AVERROR_INVALIDDATA;
+    longitude = ((int32_t) avio_rb32(pb)) / (float) (1 << 16);
+    latitude  = ((int32_t) avio_rb32(pb)) / (float) (1 << 16);
+    altitude  = ((int32_t) avio_rb32(pb)) / (float) (1 << 16);
+
+    // Try to output in the same format as the ?xyz field
+    snprintf(buf, sizeof(buf), "%+08.4f%+09.4f/", latitude, longitude);
+    if (*language && strcmp(language, "und")) {
+        char key2[16];
+        snprintf(key2, sizeof(key2), "%s-%s", key, language);
+        av_dict_set(&c->fc->metadata, key2, buf, 0);
+    }
+    return av_dict_set(&c->fc->metadata, key, buf, 0);
+}
+
 static int mov_read_udta_string(MOVContext *c, AVIOContext *pb, MOVAtom atom)
 {
 #ifdef MOV_EXPORT_ALL_METADATA
@@ -280,6 +319,8 @@ static int mov_read_udta_string(MOVContext *c, AVIOContext *pb, MOVAtom atom)
         return mov_metadata_raw(c, pb, atom.size, "premiere_version");
     case MKTAG( '@','P','R','Q'):
         return mov_metadata_raw(c, pb, atom.size, "quicktime_version");
+    case MKTAG( 'l','o','c','i'):
+        return mov_metadata_loci(c, pb, atom.size);
     }
 
     if (c->itunes_metadata && atom.size > 8) {
@@ -2156,7 +2197,7 @@ static void mov_build_index(MOVContext *mov, AVStream *st)
                 if (sc->keyframe_absent
                     && !sc->stps_count
                     && !rap_group_present
-                    && st->codec->codec_type == AVMEDIA_TYPE_AUDIO)
+                    && (st->codec->codec_type == AVMEDIA_TYPE_AUDIO || (i==0 && j==0)))
                      keyframe = 1;
                 if (keyframe)
                     distance = 0;
@@ -2610,22 +2651,8 @@ static int mov_read_tkhd(MOVContext *c, AVIOContext *pb, MOVAtom atom)
     sc->width = width >> 16;
     sc->height = height >> 16;
 
-    //Assign clockwise rotate values based on transform matrix so that
-    //we can compensate for iPhone orientation during capture.
-
-    if (display_matrix[1][0] == -65536 && display_matrix[0][1] == 65536) {
-         av_dict_set(&st->metadata, "rotate", "90", 0);
-    }
-
-    if (display_matrix[0][0] == -65536 && display_matrix[1][1] == -65536) {
-         av_dict_set(&st->metadata, "rotate", "180", 0);
-    }
-
-    if (display_matrix[1][0] == 65536 && display_matrix[0][1] == -65536) {
-         av_dict_set(&st->metadata, "rotate", "270", 0);
-    }
-
-    // save the matrix when it is not the default identity
+    // save the matrix and add rotate metadata when it is not the default
+    // identity
     if (display_matrix[0][0] != (1 << 16) ||
         display_matrix[1][1] != (1 << 16) ||
         display_matrix[2][2] != (1 << 30) ||
@@ -2633,6 +2660,7 @@ static int mov_read_tkhd(MOVContext *c, AVIOContext *pb, MOVAtom atom)
         display_matrix[1][0] || display_matrix[1][2] ||
         display_matrix[2][0] || display_matrix[2][1]) {
         int i, j;
+        double rotate;
 
         av_freep(&sc->display_matrix);
         sc->display_matrix = av_malloc(sizeof(int32_t) * 9);
@@ -2642,6 +2670,16 @@ static int mov_read_tkhd(MOVContext *c, AVIOContext *pb, MOVAtom atom)
         for (i = 0; i < 3; i++)
             for (j = 0; j < 3; j++)
                 sc->display_matrix[i * 3 + j] = display_matrix[j][i];
+
+        rotate = av_display_rotation_get(sc->display_matrix);
+        if (!isnan(rotate)) {
+            char rotate_buf[64];
+            rotate = -rotate;
+            if (rotate < 0) // for backward compatibility
+                rotate += 360;
+            snprintf(rotate_buf, sizeof(rotate_buf), "%g", rotate);
+            av_dict_set(&st->metadata, "rotate", rotate_buf, 0);
+        }
     }
 
     // transform the display width/height according to the matrix
@@ -3122,6 +3160,19 @@ static int mov_read_default(MOVContext *c, AVIOContext *pb, MOVAtom atom)
         if (atom.size >= 8) {
             a.size = avio_rb32(pb);
             a.type = avio_rl32(pb);
+            if (a.type == MKTAG('f','r','e','e') &&
+                a.size >= 8 &&
+                c->moov_retry) {
+                uint8_t buf[8];
+                uint32_t *type = (uint32_t *)buf + 1;
+                avio_read(pb, buf, 8);
+                avio_seek(pb, -8, SEEK_CUR);
+                if (*type == MKTAG('m','v','h','d') ||
+                    *type == MKTAG('c','m','o','v')) {
+                    av_log(c->fc, AV_LOG_ERROR, "Detected moov in a free atom.\n");
+                    a.type = MKTAG('m','o','o','v');
+                }
+            }
             if (atom.type != MKTAG('r','o','o','t') &&
                 atom.type != MKTAG('m','o','o','v'))
             {
@@ -3303,6 +3354,11 @@ static void mov_read_chapters(AVFormatContext *s)
         uint16_t ch;
         int len, title_len;
 
+        if (end < sample->timestamp) {
+            av_log(s, AV_LOG_WARNING, "ignoring stream duration which is shorter than chapters\n");
+            end = AV_NOPTS_VALUE;
+        }
+
         if (avio_seek(sc->pb, sample->pos, SEEK_SET) != sample->pos) {
             av_log(s, AV_LOG_ERROR, "Chapter %d not found in file\n", i);
             goto finish;
@@ -3483,11 +3539,15 @@ static int mov_read_header(AVFormatContext *s)
         atom.size = INT64_MAX;
 
     /* check MOV header */
+    do {
+    if (mov->moov_retry)
+        avio_seek(pb, 0, SEEK_SET);
     if ((err = mov_read_default(mov, pb, atom)) < 0) {
         av_log(s, AV_LOG_ERROR, "error reading header: %d\n", err);
         mov_read_close(s);
         return err;
     }
+    } while (pb->seekable && !mov->found_moov && !mov->moov_retry++);
     if (!mov->found_moov) {
         av_log(s, AV_LOG_ERROR, "moov atom not found\n");
         mov_read_close(s);

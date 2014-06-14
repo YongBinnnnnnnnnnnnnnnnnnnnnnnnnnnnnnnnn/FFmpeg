@@ -637,7 +637,10 @@ Set the first PID for data packets (default 0x0100, max 0x0f00).
 @item -mpegts_m2ts_mode @var{number}
 Enable m2ts mode if set to 1. Default value is -1 which disables m2ts mode.
 @item -muxrate @var{number}
-Set muxrate.
+Set a constant muxrate (default VBR).
+@item -pcr_period @var{numer}
+Override the default PCR retransmission time (default 20ms), ignored
+if variable muxrate is selected.
 @item -pes_payload_size @var{number}
 Set minimum PES packet payload in bytes.
 @item -mpegts_flags @var{flags}
@@ -704,6 +707,30 @@ syntax.
 Alternatively you can write the command as:
 @example
 ffmpeg -benchmark -i INPUT -f null -
+@end example
+
+@section nut
+
+@table @option
+@item -syncpoints @var{flags}
+Change the syncpoint usage in nut:
+@table @option
+@item @var{default} use the normal low-overhead seeking aids.
+@item @var{none} do not use the syncpoints at all, reducing the overhead but making the stream non-seekable;
+    Use of this option is not recommended, as the resulting files are very damage
+    sensitive and seeking is not possible. Also in general the overhead from
+    syncpoints is negligible. Note, -@code{write_index} 0 can be used to disable
+    all growing data tables, allowing to mux endless streams with limited memory
+    and wihout these disadvantages.
+@item @var{timestamped} extend the syncpoint with a wallclock field.
+@end table
+The @var{none} and @var{timestamped} flags are experimental.
+@item -write_index @var{bool}
+Write index at the end, the default is to write an index.
+@end table
+
+@example
+ffmpeg -i INPUT -f_strict experimental -syncpoints none - | processor
 @end example
 
 @section ogg

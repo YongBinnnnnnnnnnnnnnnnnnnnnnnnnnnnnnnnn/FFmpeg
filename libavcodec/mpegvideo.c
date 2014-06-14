@@ -41,6 +41,7 @@
 #include "mpegvideo.h"
 #include "mjpegenc.h"
 #include "msmpeg4.h"
+#include "qpeldsp.h"
 #include "thread.h"
 #include <limits.h>
 
@@ -103,6 +104,28 @@ const uint8_t *const ff_mpeg2_dc_scale_table[4] = {
     mpeg2_dc_scale_table1,
     mpeg2_dc_scale_table2,
     mpeg2_dc_scale_table3,
+};
+
+const uint8_t ff_alternate_horizontal_scan[64] = {
+     0,  1,  2,  3,  8,  9, 16, 17,
+    10, 11,  4,  5,  6,  7, 15, 14,
+    13, 12, 19, 18, 24, 25, 32, 33,
+    26, 27, 20, 21, 22, 23, 28, 29,
+    30, 31, 34, 35, 40, 41, 48, 49,
+    42, 43, 36, 37, 38, 39, 44, 45,
+    46, 47, 50, 51, 56, 57, 58, 59,
+    52, 53, 54, 55, 60, 61, 62, 63,
+};
+
+const uint8_t ff_alternate_vertical_scan[64] = {
+     0,  8, 16, 24,  1,  9,  2, 10,
+    17, 25, 32, 40, 48, 56, 57, 49,
+    41, 33, 26, 18,  3, 11,  4, 12,
+    19, 27, 34, 42, 50, 58, 35, 43,
+    51, 59, 20, 28,  5, 13,  6, 14,
+    21, 29, 36, 44, 52, 60, 37, 45,
+    53, 61, 22, 30,  7, 15, 23, 31,
+    38, 46, 54, 62, 39, 47, 55, 63,
 };
 
 static void dct_unquantize_mpeg1_intra_c(MpegEncContext *s,
@@ -410,6 +433,11 @@ av_cold int ff_dct_common_init(MpegEncContext *s)
 static int frame_size_alloc(MpegEncContext *s, int linesize)
 {
     int alloc_size = FFALIGN(FFABS(linesize) + 64, 32);
+
+    if (linesize < 24) {
+        av_log(s->avctx, AV_LOG_ERROR, "Image too small, temporary buffers cannot function\n");
+        return AVERROR_PATCHWELCOME;
+    }
 
     // edge emu needs blocksize + filter length - 1
     // (= 17x17 for  halfpel / 21x21 for  h264)
@@ -2474,19 +2502,20 @@ static av_always_inline void mpeg_motion_lowres(MpegEncContext *s,
                                 v_edge_pos);
         ptr_y = s->edge_emu_buffer;
         if (!CONFIG_GRAY || !(s->flags & CODEC_FLAG_GRAY)) {
-            uint8_t *uvbuf = s->edge_emu_buffer + 18 * s->linesize;
-            s->vdsp.emulated_edge_mc(uvbuf,  ptr_cb,
+            uint8_t *ubuf = s->edge_emu_buffer + 18 * s->linesize;
+            uint8_t *vbuf =ubuf + 9 * s->uvlinesize;
+            s->vdsp.emulated_edge_mc(ubuf,  ptr_cb,
                                      uvlinesize >> field_based, uvlinesize >> field_based,
                                      9, 9 + field_based,
                                     uvsrc_x, uvsrc_y << field_based,
                                     h_edge_pos >> 1, v_edge_pos >> 1);
-            s->vdsp.emulated_edge_mc(uvbuf + 16,  ptr_cr,
+            s->vdsp.emulated_edge_mc(vbuf,  ptr_cr,
                                      uvlinesize >> field_based,uvlinesize >> field_based,
                                      9, 9 + field_based,
                                     uvsrc_x, uvsrc_y << field_based,
                                     h_edge_pos >> 1, v_edge_pos >> 1);
-            ptr_cb = uvbuf;
-            ptr_cr = uvbuf + 16;
+            ptr_cb = ubuf;
+            ptr_cr = vbuf;
         }
     }
 
@@ -3208,8 +3237,11 @@ void ff_mpeg_set_erpic(ERPicture *dst, Picture *src)
     int i;
 
     memset(dst, 0, sizeof(*dst));
-    if (!src)
+    if (!src) {
+        dst->f  = NULL;
+        dst->tf = NULL;
         return;
+    }
 
     dst->f = src->f;
     dst->tf = &src->tf;

@@ -3,8 +3,7 @@ OBJS                                   += x86/constants.o               \
 
 OBJS-$(CONFIG_AC3DSP)                  += x86/ac3dsp_init.o
 OBJS-$(CONFIG_DCT)                     += x86/dct_init.o
-OBJS-$(CONFIG_DSPUTIL)                 += x86/dsputil_init.o            \
-                                          x86/dsputil_x86.o
+OBJS-$(CONFIG_DSPUTIL)                 += x86/dsputil_init.o
 OBJS-$(CONFIG_ENCODERS)                += x86/dsputilenc_mmx.o          \
                                           x86/fdct.o                    \
                                           x86/motion_est.o
@@ -18,11 +17,15 @@ OBJS-$(CONFIG_H264PRED)                += x86/h264_intrapred_init.o
 OBJS-$(CONFIG_H264QPEL)                += x86/h264_qpel.o
 OBJS-$(CONFIG_HEVC_DECODER)            += x86/hevcdsp_init.o
 OBJS-$(CONFIG_HPELDSP)                 += x86/hpeldsp_init.o
+OBJS-$(CONFIG_LLAUDDSP)                += x86/lossless_audiodsp_init.o
 OBJS-$(CONFIG_LLVIDDSP)                += x86/lossless_videodsp_init.o
+OBJS-$(CONFIG_HUFFYUVDSP)              += x86/huffyuvdsp_init.o
+OBJS-$(CONFIG_HUFFYUVENCDSP)           += x86/huffyuvencdsp_mmx.o
 OBJS-$(CONFIG_LPC)                     += x86/lpc.o
 OBJS-$(CONFIG_MPEGAUDIODSP)            += x86/mpegaudiodsp.o
 OBJS-$(CONFIG_MPEGVIDEO)               += x86/mpegvideo.o
 OBJS-$(CONFIG_MPEGVIDEOENC)            += x86/mpegvideoenc.o
+OBJS-$(CONFIG_QPELDSP)                 += x86/qpeldsp_init.o
 OBJS-$(CONFIG_VIDEODSP)                += x86/videodsp_init.o
 OBJS-$(CONFIG_VP3DSP)                  += x86/vp3dsp_init.o
 OBJS-$(CONFIG_XMM_CLOBBER_TEST)        += x86/w64xmmtest.o
@@ -38,6 +41,7 @@ OBJS-$(CONFIG_PRORES_LGPL_DECODER)     += x86/proresdsp_init.o
 OBJS-$(CONFIG_RV30_DECODER)            += x86/rv34dsp_init.o
 OBJS-$(CONFIG_RV40_DECODER)            += x86/rv34dsp_init.o            \
                                           x86/rv40dsp_init.o
+OBJS-$(CONFIG_SVQ1_ENCODER)            += x86/svq1enc_mmx.o
 OBJS-$(CONFIG_V210_DECODER)            += x86/v210-init.o
 OBJS-$(CONFIG_TTA_DECODER)             += x86/ttadsp_init.o
 OBJS-$(CONFIG_TRUEHD_DECODER)          += x86/mlpdsp.o
@@ -54,7 +58,7 @@ MMX-OBJS-$(CONFIG_DSPUTIL)             += x86/dsputil_mmx.o             \
                                           x86/idct_sse2_xvid.o          \
                                           x86/simple_idct.o
 MMX-OBJS-$(CONFIG_DIRAC_DECODER)       += x86/dirac_dwt.o
-MMX-OBJS-$(CONFIG_HPELDSP)             += x86/hpeldsp_mmx.o
+MMX-OBJS-$(CONFIG_HUFFYUVDSP)          += x86/huffyuvdsp_mmx.o
 
 MMX-OBJS-$(CONFIG_SNOW_DECODER)        += x86/snowdsp.o
 MMX-OBJS-$(CONFIG_SNOW_ENCODER)        += x86/snowdsp.o
@@ -68,10 +72,7 @@ YASM-OBJS-$(CONFIG_DCT)                += x86/dct32.o
 YASM-OBJS-$(CONFIG_DIRAC_DECODER)      += x86/diracdsp_mmx.o x86/diracdsp_yasm.o\
                                           x86/dwt_yasm.o
 YASM-OBJS-$(CONFIG_DNXHD_ENCODER)      += x86/dnxhdenc.o
-YASM-OBJS-$(CONFIG_DSPUTIL)            += x86/dsputil.o                 \
-                                          x86/fpel.o                    \
-                                          x86/mpeg4qpel.o               \
-                                          x86/qpel.o
+YASM-OBJS-$(CONFIG_DSPUTIL)            += x86/dsputil.o
 YASM-OBJS-$(CONFIG_ENCODERS)           += x86/dsputilenc.o
 YASM-OBJS-$(CONFIG_FFT)                += x86/fft.o
 YASM-OBJS-$(CONFIG_FLAC_DECODER)       += x86/flacdsp.o
@@ -94,8 +95,13 @@ YASM-OBJS-$(CONFIG_HEVC_DECODER)       += x86/hevc_mc.o                 \
                                           x86/hevc_deblock.o
 YASM-OBJS-$(CONFIG_HPELDSP)            += x86/fpel.o                    \
                                           x86/hpeldsp.o
+YASM-OBJS-$(CONFIG_HUFFYUVDSP)         += x86/huffyuvdsp.o
+YASM-OBJS-$(CONFIG_LLAUDDSP)           += x86/lossless_audiodsp.o
 YASM-OBJS-$(CONFIG_LLVIDDSP)           += x86/lossless_videodsp.o
 YASM-OBJS-$(CONFIG_MPEGAUDIODSP)       += x86/imdct36.o
+YASM-OBJS-$(CONFIG_QPELDSP)            += x86/qpeldsp.o                 \
+                                          x86/fpel.o                    \
+                                          x86/qpel.o
 YASM-OBJS-$(CONFIG_VIDEODSP)           += x86/videodsp.o
 YASM-OBJS-$(CONFIG_VP3DSP)             += x86/vp3dsp.o
 
