@@ -20,7 +20,7 @@
 #endif
 
 #ifdef HAVE_GL
-#include "glsym.h"
+#include "glsym/glsym.h"
 #endif
 
 static bool reset_triggered;
@@ -1067,7 +1067,7 @@ static void decode_thread(void *data)
 #ifdef HAVE_GL
 static void context_reset(void)
 {
-   glsym_init_procs(hw_render.get_proc_address);
+   rglgen_resolve_symbols(hw_render.get_proc_address);
 
    prog = glCreateProgram();
    GLuint vert = glCreateShader(GL_VERTEX_SHADER);

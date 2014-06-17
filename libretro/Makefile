@@ -239,7 +239,7 @@ endif
 LIBAVCODEC_SOURCE :=
 LIBAVFORMAT_SOURCE :=
 LIBAVUTIL_SOURCE :=
-LIBRETRO_SOURCE := libretro.c fifo_buffer.c thread.c
+LIBRETRO_SOURCE := libretro.c fifo_buffer.c thread.c glsym/rglgen.c
 DEPS_SOURCE :=
 
 ifeq ($(HAVE_BIGENDIAN),1)
@@ -2082,11 +2082,12 @@ endif
 ifeq ($(HAVE_GL), 1)
    ifeq ($(GLES), 1)
       LIBS += -lGLESv2
-      CFLAGS += -DGLES
+      CFLAGS += -DGLES -DHAVE_OPENGLES2
+		SOURCE += glsym/glsym_es2.c
    else
       LIBS += $(GL_LIB)
    endif
-   LIBRETRO_SOURCE += glsym.c
+   LIBRETRO_SOURCE += glsym/glsym_gl.c
 endif
 
 OBJECTS := $(DEPS_SOURCE:.c=.o) $(LIBRETRO_SOURCE:.c=.o) $(LIBAVUTIL_SOURCE:.c=.o) $(LIBAVFORMAT_SOURCE:.c=.o) $(LIBSWSCALE_SOURCE:.c=.o) $(LIBAVCODEC_SOURCE:.c=.o) $(LIBSWRESAMPLE_SOURCE:.c=.o)
