@@ -2268,7 +2268,7 @@ h264_parser_select="h264_decoder"
 hevc_parser_select="hevc_decoder"
 mpegvideo_parser_select="error_resilience mpegvideo"
 mpeg4video_parser_select="error_resilience h263dsp mpegvideo qpeldsp"
-vc1_parser_select="mpegvideo"
+vc1_parser_select="mpegvideo vc1_decoder"
 
 # external libraries
 libaacplus_encoder_deps="libaacplus"
@@ -2627,6 +2627,7 @@ host_os=$target_os_default
 # machine
 if test "$target_os_default" = aix; then
     arch_default=$(uname -p)
+    strip_default="strip -X32_64"
 else
     arch_default=$(uname -m)
 fi
@@ -3868,6 +3869,13 @@ case $target_os in
         add_cppflags '-I\$(SRC_PATH)/compat/aix'
         enabled shared && add_ldflags -Wl,-brtl
         ;;
+    android)
+        disable symver
+        SLIB_INSTALL_NAME='$(SLIBNAME)'
+        SLIB_INSTALL_LINKS=
+        # soname not set on purpose
+        SHFLAGS=-shared
+        ;;
     haiku)
         prefix_default="/boot/common"
         network_extralibs="-lnetwork"
@@ -4279,9 +4287,9 @@ EOF
 od -t x1 $TMPO | grep -q '42 *49 *47 *45' && enable bigendian
 
 
-if enabled asm; then
+if enabled asm && ! enabled_any ppc64 pic; then
     enabled     arm         && nogas=die
-    enabled_all ppc altivec && nogas=warn
+    enabled_all ppc altivec && [ $target_os_default != aix ] && nogas=warn
     as=${gas:=$as}
     check_as <<EOF && enable gnu_as || \
         $nogas "GNU assembler not found, install gas-preprocessor"
