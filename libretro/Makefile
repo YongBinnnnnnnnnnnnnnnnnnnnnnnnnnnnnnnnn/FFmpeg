@@ -93,6 +93,7 @@ ifeq ($(OPENGL),1)
    GL_LIB := -lGL
    CFLAGS += -DHAVE_GL
    HAVE_GL := 1
+	HAVE_GL_FFT := 1
 endif
    HAVE_SSA := 1
 
@@ -143,6 +144,7 @@ else ifneq (,$(findstring osx,$(platform)))
 ifeq ($(OPENGL),1)
    GL_LIB := -framework OpenGL
    HAVE_GL := 1
+	HAVE_GL_FFT := 1
    CFLAGS += -DHAVE_GL
 endif
 HAVE_PTHREADS = 1
@@ -192,6 +194,7 @@ endif
 else ifneq (,$(findstring win,$(platform)))
 	ARCH_X86 = 1
    CC = gcc
+	CXX = g++
    TARGET := $(TARGET_NAME)_libretro.dll
    SHARED := -shared -static-libgcc -static-libstdc++ -s -Wl,--version-script=link.T -Wl,--no-undefined
    CFLAGS += -Iffmpeg
@@ -199,6 +202,7 @@ ifeq ($(OPENGL),1)
    GL_LIB := -lopengl32
    CFLAGS += -DHAVE_GL
    HAVE_GL := 1
+	HAVE_GL_FFT := 1
 	WIN32_PLATFORM := 1
 endif
    LIBS += -L.
@@ -2071,7 +2075,15 @@ endif
 
 endif
 
-CFLAGS += -Wall -std=gnu99 -pedantic $(fpic)
+ifeq ($(HAVE_GL_FFT), 1)
+   CFLAGS += -DHAVE_GL_FFT
+   ifeq ($(GLES), 1)
+      CFLAGS += -DHAVE_OPENGLES3
+   endif
+   OBJECTS += fft/fft.o
+endif
+
+CFLAGS += -Wall -pedantic $(fpic)
 
 ifeq ($(DEBUG), 1)
    CFLAGS += -O0 -g
@@ -2095,10 +2107,13 @@ OBJECTS := $(DEPS_SOURCE:.c=.o) $(LIBRETRO_SOURCE:.c=.o) $(LIBAVUTIL_SOURCE:.c=.
 all: $(TARGET)
 
 %.o: %.c
-	$(CC) -c -o $@ $< $(CFLAGS)
+	$(CC) -c -std=gnu99 -o $@ $< $(CFLAGS)
+
+%.o: %.cpp
+	$(CXX) -c -ansi -o $@ $< $(CFLAGS)
 
 $(TARGET): $(OBJECTS)
-	$(CC) -o $@ $^ $(LIBS) $(SHARED)
+	$(CXX) -o $@ $^ $(LIBS) $(SHARED)
 
 clean:
 	rm -f $(OBJECTS)
