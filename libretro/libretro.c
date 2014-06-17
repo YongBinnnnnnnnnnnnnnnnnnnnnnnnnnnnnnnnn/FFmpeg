@@ -7,6 +7,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <assert.h>
+#include <stdarg.h>
 
 #include <libavformat/avformat.h>
 #include <libavcodec/avcodec.h>
@@ -28,6 +29,13 @@
 #endif
 
 static bool reset_triggered;
+static void fallback_log(enum retro_log_level level, const char *fmt, ...)
+{
+   va_list va;
+   va_start(va, fmt);
+   vfprintf(stderr, fmt, va);
+   va_end(va);
+}
 
 retro_log_printf_t log_cb;
 static retro_video_refresh_t video_cb;
@@ -38,8 +46,7 @@ static retro_input_poll_t input_poll_cb;
 static retro_input_state_t input_state_cb;
 
 #define LOG_ERR_GOTO(msg, label) do { \
-   if (log_cb) \
-      log_cb(RETRO_LOG_ERROR, "[FFmpeg]: " msg "\n"); \
+   log_cb(RETRO_LOG_ERROR, "[FFmpeg]: " msg "\n"); \
    goto label; \
 } while(0)
 
@@ -79,6 +86,9 @@ static size_t attachments_size;
 
 #ifdef HAVE_GL_FFT
 static glfft_t *fft;
+unsigned fft_width;
+unsigned fft_height;
+unsigned fft_multisample;
 #endif
 
 // A/V timing.
@@ -147,7 +157,7 @@ static struct
 static void ass_msg_cb(int level, const char *fmt, va_list args, void *data)
 {
    (void)data;
-   if (level < 6 && log_cb)
+   if (level < 6)
       log_cb(RETRO_LOG_INFO, fmt);
 }
 #endif
@@ -205,6 +215,15 @@ void retro_get_system_av_info(struct retro_system_av_info *info)
    unsigned height = vctx ? media.height : 240;
    float aspect = vctx ? media.aspect : 0.0;
 
+#ifdef HAVE_GL_FFT
+   if (audio_streams_num > 0 && video_stream < 0)
+   {
+      width = fft_width;
+      height = fft_height;
+      aspect = 16.0 / 9.0;
+   }
+#endif
+
    info->geometry = (struct retro_game_geometry) {
       .base_width   = width,
       .base_height  = height,
@@ -222,11 +241,21 @@ void retro_set_environment(retro_environment_t cb)
 #ifdef HAVE_GL
       { "ffmpeg_temporal_interp", "Temporal Interpolation; enabled|disabled" },
 #endif
+#ifdef HAVE_GL_FFT
+      { "ffmpeg_fft_resolution", "GLFFT Resolution; 1280x720|1920x1080|640x360|320x180" },
+      { "ffmpeg_fft_multisample", "GLFFT Multisample; 1x|2x|4x" },
+#endif
       { "ffmpeg_color_space", "Colorspace; auto|BT.709|BT.601|FCC|SMPTE240M" },
       { NULL, NULL },
    };
 
    cb(RETRO_ENVIRONMENT_SET_VARIABLES, (void*)vars);
+
+   struct retro_log_callback log;
+   if (cb(RETRO_ENVIRONMENT_GET_LOG_INTERFACE, &log))
+      log_cb = log.log;
+   else
+      log_cb = fallback_log;
 }
 
 void retro_set_audio_sample(retro_audio_sample_t cb)
@@ -254,7 +283,6 @@ void retro_set_video_refresh(retro_video_refresh_t cb)
    video_cb = cb;
 }
 
-
 void retro_reset(void)
 {
    reset_triggered = true;
@@ -274,6 +302,32 @@ static void check_variables(void)
       else if (!strcmp(var.value, "disabled"))
          temporal_interpolation = false;
    }
+#endif
+
+#ifdef HAVE_GL_FFT
+   struct retro_variable fft_var = {
+      .key = "ffmpeg_fft_resolution",
+   };
+
+   fft_width = 1280;
+   fft_height = 720;
+   fft_multisample = 1;
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &fft_var) && fft_var.value)
+   {
+      unsigned w, h;
+      if (sscanf(fft_var.value, "%ux%u", &w, &h) == 2)
+      {
+         fft_width = w;
+         fft_height = h;
+      }
+   }
+
+   struct retro_variable fft_ms_var = {
+      .key = "ffmpeg_fft_multisample",
+   };
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &fft_ms_var) && fft_ms_var.value)
+      fft_multisample = strtoul(fft_ms_var.value, NULL, 0);
 #endif
 
    struct retro_variable color_var = {
@@ -315,8 +369,7 @@ static void seek_frame(int seek_frames)
 
    if (seek_frames < 0)
    {
-      if (log_cb)
-         log_cb(RETRO_LOG_INFO, "Resetting PTS.\n");
+      log_cb(RETRO_LOG_INFO, "Resetting PTS.\n");
       frames[0].pts = 0.0;
       frames[1].pts = 0.0;
    }
@@ -336,8 +389,31 @@ static void seek_frame(int seek_frames)
 void retro_run(void)
 {
    bool updated = false;
+
+#ifdef HAVE_GL_FFT
+   unsigned old_fft_width = fft_width;
+   unsigned old_fft_height = fft_height;
+   unsigned old_fft_multisample = fft_multisample;
+#endif
+
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE, &updated) && updated)
       check_variables();
+
+#ifdef HAVE_GL_FFT
+   if (fft_width != old_fft_width || fft_height != old_fft_height)
+   {
+      struct retro_system_av_info info;
+      retro_get_system_av_info(&info);
+      if (!environ_cb(RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO, &info))
+      {
+         fft_width = old_fft_width;
+         fft_height = old_fft_height;
+      }
+   }
+
+   if (fft && (old_fft_multisample != fft_multisample))
+      glfft_init_multisample(fft, fft_width, fft_height, fft_multisample);
+#endif
 
    input_poll_cb();
 
@@ -448,8 +524,7 @@ void retro_run(void)
       pts_bias = reading_pts - expected_pts;
       if (pts_bias < old_pts_bias - 1.0)
       {
-         if (log_cb)
-            log_cb(RETRO_LOG_INFO, "Resetting PTS (bias).\n");
+         log_cb(RETRO_LOG_INFO, "Resetting PTS (bias).\n");
          frames[0].pts = 0.0;
          frames[1].pts = 0.0;
       }
@@ -567,6 +642,24 @@ void retro_run(void)
       video_cb(dupe ? NULL : video_frame_temp_buffer, media.width, media.height, media.width * sizeof(uint32_t));
 #endif
    }
+#ifdef HAVE_GL_FFT
+   else if (fft)
+   {
+      unsigned frames = to_read_frames;
+      const int16_t *buffer = audio_buffer;
+      while (frames)
+      {
+         unsigned to_read = frames;
+         if (to_read > (1 << 11)) // FFT size we use (1 << 11). Really shouldn't happen unless we use a crazy high sample rate.
+            to_read = 1 << 11;
+         glfft_step_fft(fft, buffer, to_read);
+         buffer += to_read * 2;
+         frames -= to_read;
+      }
+      glfft_render(fft, hw_render.get_current_framebuffer(), fft_width, fft_height);
+      video_cb(RETRO_HW_FRAME_BUFFER_VALID, fft_width, fft_height, fft_width * sizeof(uint32_t));
+   }
+#endif
    else
       video_cb(NULL, 1, 1, sizeof(uint32_t));
 
@@ -579,8 +672,7 @@ static bool open_codec(AVCodecContext **ctx, unsigned index)
    AVCodec *codec = avcodec_find_decoder(fctx->streams[index]->codec->codec_id);
    if (!codec)
    {
-      if (log_cb)
-         log_cb(RETRO_LOG_ERROR, "Couldn't find suitable decoder, exiting ... \n");
+      log_cb(RETRO_LOG_ERROR, "Couldn't find suitable decoder, exiting ... \n");
       return false;
    }
 
@@ -589,6 +681,19 @@ static bool open_codec(AVCodecContext **ctx, unsigned index)
       return false;
 
    return true;
+}
+
+static bool codec_is_image(enum AVCodecID id)
+{
+   switch (id)
+   {
+      case CODEC_ID_MJPEG:
+      case CODEC_ID_PNG:
+         return true;
+
+      default:
+         return false;
+   }
 }
 
 static bool open_codecs(void)
@@ -616,7 +721,7 @@ static bool open_codecs(void)
             break;
 
          case AVMEDIA_TYPE_VIDEO:
-            if (!vctx)
+            if (!vctx && !codec_is_image(fctx->streams[i]->codec->codec_id))
             {
                if (!open_codec(&vctx, i))
                   return false;
@@ -797,8 +902,7 @@ static int16_t *decode_audio(AVCodecContext *ctx, AVPacket *pkt, AVFrame *frame,
             scond_wait(fifo_decode_cond, fifo_lock);
          else
          {
-            if (log_cb)
-               log_cb(RETRO_LOG_ERROR, "Thread: Audio deadlock detected ...\n");
+            log_cb(RETRO_LOG_ERROR, "Thread: Audio deadlock detected ...\n");
             fifo_clear(audio_decode_fifo);
             break;
          }
@@ -825,7 +929,7 @@ static void decode_thread_seek(double time)
    decode_last_audio_time = time;
 
    int ret = avformat_seek_file(fctx, -1, INT64_MIN, seek_to, INT64_MAX, 0);
-   if (ret < 0 && log_cb)
+   if (ret < 0)
       log_cb(RETRO_LOG_ERROR, "av_seek_frame() failed.\n");
 
    if (actx[audio_streams_ptr])
@@ -1032,7 +1136,7 @@ static void decode_thread(void *data)
          int finished = 0;
          while (!finished)
          {
-            if (avcodec_decode_subtitle2(sctx_active, &sub, &finished, &pkt) < 0 && log_cb)
+            if (avcodec_decode_subtitle2(sctx_active, &sub, &finished, &pkt) < 0)
             {
                log_cb(RETRO_LOG_ERROR, "Decode subtitles failed.\n");
                break;
@@ -1073,9 +1177,30 @@ static void decode_thread(void *data)
 }
 
 #ifdef HAVE_GL
+static void context_destroy(void)
+{
+#ifdef HAVE_GL_FFT
+   if (fft)
+   {
+      glfft_free(fft);
+      fft = NULL;
+   }
+#endif
+}
+
 static void context_reset(void)
 {
-   rglgen_resolve_symbols(hw_render.get_proc_address);
+#ifdef HAVE_GL_FFT
+   if (audio_streams_num > 0 && video_stream < 0)
+   {
+      fft = glfft_new(11, hw_render.get_proc_address);
+      if (fft)
+         glfft_init_multisample(fft, fft_width, fft_height, fft_multisample);
+   }
+   // Already inits symbols.
+   if (!fft)
+#endif
+      rglgen_resolve_symbols(hw_render.get_proc_address);
 
    prog = glCreateProgram();
    GLuint vert = glCreateShader(GL_VERTEX_SHADER);
@@ -1099,7 +1224,7 @@ static void context_reset(void)
       "void main() { gl_FragColor = vec4(pow(mix(pow(texture2D(sTex0, vTex).bgr, vec3(2.2)), pow(texture2D(sTex1, vTex).bgr, vec3(2.2)), uMix), vec3(1.0 / 2.2)), 1.0); }\n";
       // Get format as GL_RGBA/GL_UNSIGNED_BYTE. Assume little endian, so we get ARGB -> BGRA byte order, and we have to swizzle to .BGR.
 #else
-   "void main() { gl_FragColor = vec4(pow(mix(pow(texture2D(sTex0, vTex).rgb, vec3(2.2)), pow(texture2D(sTex1, vTex).rgb, vec3(2.2)), uMix), vec3(1.0 / 2.2)), 1.0); }\n";
+      "void main() { gl_FragColor = vec4(pow(mix(pow(texture2D(sTex0, vTex).rgb, vec3(2.2)), pow(texture2D(sTex1, vTex).rgb, vec3(2.2)), uMix), vec3(1.0 / 2.2)), 1.0); }\n";
 #endif
 
    glShaderSource(vert, 1, &vertex_source, NULL);
@@ -1176,12 +1301,21 @@ bool retro_load_game(const struct retro_game_info *info)
 
    decode_thread_dead = false;
 
-   if (video_stream >= 0)
+   bool is_glfft = false;
+#ifdef HAVE_GL_FFT
+   is_glfft = video_stream < 0 && audio_streams_num > 0;
+#endif
+
+   if (video_stream >= 0 || is_glfft)
    {
       video_decode_fifo = fifo_new(media.width * media.height * sizeof(uint32_t) * 32);
 
 #ifdef HAVE_GL
       hw_render.context_reset = context_reset;
+      hw_render.context_destroy = context_destroy;
+      hw_render.bottom_left_origin = is_glfft;
+      hw_render.depth = is_glfft;
+      hw_render.stencil = is_glfft;
 #ifdef GLES
       hw_render.context_type = RETRO_HW_CONTEXT_OPENGLES2;
 #else
@@ -1192,7 +1326,10 @@ bool retro_load_game(const struct retro_game_info *info)
 #endif
    }
    if (audio_streams_num > 0)
-      audio_decode_fifo = fifo_new(20 * media.sample_rate * sizeof(int16_t) * 2);
+   {
+      unsigned buffer_seconds = video_stream >= 0 ? 20 : 1;
+      audio_decode_fifo = fifo_new(buffer_seconds * media.sample_rate * sizeof(int16_t) * 2);
+   }
 
    fifo_cond = scond_new();
    fifo_decode_cond = scond_new();

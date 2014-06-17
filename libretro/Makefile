@@ -2080,10 +2080,10 @@ ifeq ($(HAVE_GL_FFT), 1)
    ifeq ($(GLES), 1)
       CFLAGS += -DHAVE_OPENGLES3
    endif
-   OBJECTS += fft/fft.o
+   FFT_SOURCE += fft/fft.cpp
 endif
 
-CFLAGS += -Wall -pedantic $(fpic)
+CFLAGS += -Wall $(fpic)
 
 ifeq ($(DEBUG), 1)
    CFLAGS += -O0 -g
@@ -2102,7 +2102,7 @@ ifeq ($(HAVE_GL), 1)
    LIBRETRO_SOURCE += glsym/glsym_gl.c
 endif
 
-OBJECTS := $(DEPS_SOURCE:.c=.o) $(LIBRETRO_SOURCE:.c=.o) $(LIBAVUTIL_SOURCE:.c=.o) $(LIBAVFORMAT_SOURCE:.c=.o) $(LIBSWSCALE_SOURCE:.c=.o) $(LIBAVCODEC_SOURCE:.c=.o) $(LIBSWRESAMPLE_SOURCE:.c=.o)
+OBJECTS := $(DEPS_SOURCE:.c=.o) $(LIBRETRO_SOURCE:.c=.o) $(FFT_SOURCE:.cpp=.o) $(LIBAVUTIL_SOURCE:.c=.o) $(LIBAVFORMAT_SOURCE:.c=.o) $(LIBSWSCALE_SOURCE:.c=.o) $(LIBAVCODEC_SOURCE:.c=.o) $(LIBSWRESAMPLE_SOURCE:.c=.o)
 
 all: $(TARGET)
 
@@ -2110,7 +2110,7 @@ all: $(TARGET)
 	$(CC) -c -std=gnu99 -o $@ $< $(CFLAGS)
 
 %.o: %.cpp
-	$(CXX) -c -ansi -o $@ $< $(CFLAGS)
+	$(CXX) -c -std=gnu++03 -fno-strict-aliasing -o $@ $< $(CFLAGS)
 
 $(TARGET): $(OBJECTS)
 	$(CXX) -o $@ $^ $(LIBS) $(SHARED)

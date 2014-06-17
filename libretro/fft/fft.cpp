@@ -6,12 +6,15 @@
 #include <math.h>
 #include <new>
 
+#include "../libretro.h"
+extern retro_log_printf_t log_cb;
+
 #define GLM_SWIZZLE
 #define GLM_FORCE_RADIANS
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtc/type_ptr.hpp>
-#include <glm/gtc/constants.hpp>
+#include "glm/glm.hpp"
+#include "glm/gtc/matrix_transform.hpp"
+#include "glm/gtc/type_ptr.hpp"
+#include "glm/gtc/constants.hpp"
 using namespace glm;
 
 #define GL_DEBUG 0
@@ -19,7 +22,7 @@ using namespace glm;
 #define GL_CHECK_ERROR() do { \
    if (glGetError() != GL_NO_ERROR) \
    { \
-      fprintf(stderr, "GL error at line: %d\n", __LINE__); \
+      log_cb(RETRO_LOG_ERROR, "GL error at line: %d\n", __LINE__); \
       abort(); \
    } \
 } while(0)
@@ -236,11 +239,11 @@ GLuint GLFFT::compile_shader(GLenum type, const char *source)
 
    if (!status)
    {
-      fprintf(stderr, "Failed to compile.\n");
+      log_cb(RETRO_LOG_ERROR, "Failed to compile.\n");
       char log_info[8 * 1024];
       GLsizei log_len;
       glGetShaderInfoLog(shader, sizeof(log_info), &log_len, log_info);
-      fprintf(stderr, "ERROR: %s\n", log_info);
+      log_cb(RETRO_LOG_ERROR, "ERROR: %s\n", log_info);
       return 0;
    }
 
@@ -261,11 +264,11 @@ GLuint GLFFT::compile_program(const char *vertex_source, const char *fragment_so
    glGetProgramiv(prog, GL_LINK_STATUS, &status);
    if (!status)
    {
-      fprintf(stderr, "Failed to link.\n");
+      log_cb(RETRO_LOG_ERROR, "Failed to link.\n");
       char log_info[8 * 1024];
       GLsizei log_len;
       glGetProgramInfoLog(prog, sizeof(log_info), &log_len, log_info);
-      fprintf(stderr, "ERROR: %s\n", log_info);
+      log_cb(RETRO_LOG_ERROR, "ERROR: %s\n", log_info);
    }
 
    glDeleteShader(vert);
@@ -276,7 +279,7 @@ GLuint GLFFT::compile_program(const char *vertex_source, const char *fragment_so
 void GLFFT::render(GLuint backbuffer, unsigned width, unsigned height)
 {
    // Render scene.
-   glBindFramebuffer(GL_FRAMEBUFFER, backbuffer);
+   glBindFramebuffer(GL_FRAMEBUFFER, ms_fbo ? ms_fbo : backbuffer);
    glViewport(0, 0, width, height);
    glClearColor(0.1f, 0.15f, 0.1f, 1.0f);
    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
@@ -296,6 +299,21 @@ void GLFFT::render(GLuint backbuffer, unsigned width, unsigned height)
    glDrawElements(GL_TRIANGLE_STRIP, block.elems, GL_UNSIGNED_INT, NULL);
    glBindVertexArray(0);
    glUseProgram(0);
+
+   if (ms_fbo)
+   {
+      glBindFramebuffer(GL_READ_FRAMEBUFFER, ms_fbo);
+      glBindFramebuffer(GL_DRAW_FRAMEBUFFER, backbuffer);
+      glBlitFramebuffer(0, 0, width, height, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+
+      static const GLenum attachments[] = { GL_COLOR_ATTACHMENT0, GL_DEPTH_STENCIL_ATTACHMENT };
+      glBindFramebuffer(GL_FRAMEBUFFER, ms_fbo);
+      glInvalidateFramebuffer(GL_FRAMEBUFFER, 2, attachments);
+      GL_CHECK_ERROR();
+   }
+
+   glBindFramebuffer(GL_FRAMEBUFFER, 0);
+   GL_CHECK_ERROR();
 }
 
 void GLFFT::step_fft(const GLshort *audio_buffer, unsigned frames)
@@ -311,8 +329,9 @@ void GLFFT::step_fft(const GLshort *audio_buffer, unsigned frames)
    glBindTexture(GL_TEXTURE_2D, input_tex);
    glUseProgram(prog_real);
 
-   memmove(sliding.data(), sliding.data() + frames * 2, (sliding.size() - 2 * frames) * sizeof(GLshort));
-   memcpy(sliding.data() + sliding.size() - frames * 2, audio_buffer, 2 * frames * sizeof(GLshort));
+   GLshort *slide = &sliding[0];
+   memmove(slide, slide + frames * 2, (sliding.size() - 2 * frames) * sizeof(GLshort));
+   memcpy(slide + sliding.size() - frames * 2, audio_buffer, 2 * frames * sizeof(GLshort));
 
    // Upload audio data to GPU.
    glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pbo);
@@ -320,7 +339,7 @@ void GLFFT::step_fft(const GLshort *audio_buffer, unsigned frames)
             2 * fft_size * sizeof(GLshort), GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT));
    if (buffer)
    {
-      memcpy(buffer, sliding.data(), sliding.size() * sizeof(GLshort));
+      memcpy(buffer, slide, sliding.size() * sizeof(GLshort));
       glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
    }
    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, fft_size, 1, GL_RG_INTEGER, GL_SHORT, NULL);
@@ -503,8 +522,21 @@ void GLFFT::init_target(Target &target, GLenum format, unsigned width, unsigned 
    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
       target.tex, 0);
 
-   glClearColor(0, 0, 0, 0);
-   glClear(GL_COLOR_BUFFER_BIT);
+   if (format == GL_RGBA8)
+   {
+      glClearColor(0, 0, 0, 0);
+      glClear(GL_COLOR_BUFFER_BIT);
+   }
+   else if (format == GL_RG16I)
+   {
+      static const GLint v[] = { 0, 0, 0, 0 };
+      glClearBufferiv(GL_COLOR, 0, v);
+   }
+   else
+   {
+      static const GLuint v[] = { 0, 0, 0, 0 };
+      glClearBufferuiv(GL_COLOR, 0, v);
+   }
    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
@@ -551,7 +583,7 @@ void GLFFT::init_fft()
       window[i] = round(0xffff * w * window_mod);
    }
    glBindTexture(GL_TEXTURE_2D, window_tex);
-   glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, fft_size, 1, GL_RED_INTEGER, GL_UNSIGNED_SHORT, window.data());
+   glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, fft_size, 1, GL_RED_INTEGER, GL_UNSIGNED_SHORT, &window[0]);
    glBindTexture(GL_TEXTURE_2D, 0);
 
    GL_CHECK_ERROR();
@@ -567,11 +599,11 @@ void GLFFT::init_fft()
       init_texture(passes[i].parameter_tex, GL_RG32UI, fft_size, 1);
 
       std::vector<GLuint> param_buffer(2 * fft_size);
-      build_fft_params(param_buffer.data(), i, fft_size);
+      build_fft_params(&param_buffer[0], i, fft_size);
 
       glBindTexture(GL_TEXTURE_2D, passes[i].parameter_tex);
       glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0,
-            fft_size, 1, GL_RG_INTEGER, GL_UNSIGNED_INT, param_buffer.data());
+            fft_size, 1, GL_RG_INTEGER, GL_UNSIGNED_INT, &param_buffer[0]);
       glBindTexture(GL_TEXTURE_2D, 0);
    }
 
@@ -599,11 +631,11 @@ void GLFFT::init_block()
    }
    glGenBuffers(1, &block.vbo);
    glBindBuffer(GL_ARRAY_BUFFER, block.vbo);
-   glBufferData(GL_ARRAY_BUFFER, block_vertices.size() * sizeof(GLushort), block_vertices.data(), GL_STATIC_DRAW);
+   glBufferData(GL_ARRAY_BUFFER, block_vertices.size() * sizeof(GLushort), &block_vertices[0], GL_STATIC_DRAW);
 
    block.elems = (2 * fft_block_size - 1) * (fft_depth - 1) + 1;
    std::vector<GLuint> block_indices(block.elems);
-   GLuint *bp = block_indices.data();
+   GLuint *bp = &block_indices[0];
 
    int pos = 0;
    for (int y = 0; y < int(fft_depth) - 1; y++)
@@ -623,7 +655,7 @@ void GLFFT::init_block()
 
    glGenBuffers(1, &block.ibo);
    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, block.ibo);
-   glBufferData(GL_ELEMENT_ARRAY_BUFFER, block_indices.size() * sizeof(GLuint), block_indices.data(), GL_STATIC_DRAW);
+   glBufferData(GL_ELEMENT_ARRAY_BUFFER, block_indices.size() * sizeof(GLuint), &block_indices[0], GL_STATIC_DRAW);
 
    glEnableVertexAttribArray(0);
    glVertexAttribPointer(0, 2, GL_UNSIGNED_SHORT, GL_FALSE, 0, 0);
@@ -658,8 +690,43 @@ void GLFFT::context_reset(unsigned fft_steps, rglgen_proc_address_t proc, unsign
    GL_CHECK_ERROR();
 }
 
+void GLFFT::init_multisample(unsigned width, unsigned height, unsigned samples)
+{
+   if (ms_rb_color)
+      glDeleteRenderbuffers(1, ms_rb_color.addr());
+   if (ms_rb_ds)
+      glDeleteRenderbuffers(1, ms_rb_ds.addr());
+   if (ms_fbo)
+      glDeleteFramebuffers(1, ms_fbo.addr());
+   ms_rb_color = 0;
+   ms_rb_ds = 0;
+   ms_fbo = 0;
+
+   if (samples > 1)
+   {
+      glGenRenderbuffers(1, ms_rb_color.addr());
+      glGenRenderbuffers(1, ms_rb_ds.addr());
+      glGenFramebuffers(1, ms_fbo.addr());
+
+      glBindRenderbuffer(GL_RENDERBUFFER, ms_rb_color);
+      glRenderbufferStorageMultisample(GL_RENDERBUFFER, samples, GL_RGBA8, width, height);
+      glBindRenderbuffer(GL_RENDERBUFFER, ms_rb_ds);
+      glRenderbufferStorageMultisample(GL_RENDERBUFFER, samples, GL_DEPTH24_STENCIL8, width, height);
+      glBindRenderbuffer(GL_RENDERBUFFER, 0);
+
+      glBindFramebuffer(GL_FRAMEBUFFER, ms_fbo);
+      glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, ms_rb_color);
+      glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, ms_rb_ds);
+      if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+         init_multisample(0, 0, 0);
+   }
+
+   glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
 void GLFFT::context_destroy()
 {
+   init_multisample(0, 0, 0);
    passes.clear();
    sliding.clear();
 }
@@ -696,7 +763,7 @@ void glfft_free(glfft_t *fft)
    delete fft;
 }
 
-void glfft_step_fft(glfft_t *fft, GLshort *buffer, unsigned frames)
+void glfft_step_fft(glfft_t *fft, const GLshort *buffer, unsigned frames)
 {
    fft->step_fft(buffer, frames);
 }
@@ -704,5 +771,10 @@ void glfft_step_fft(glfft_t *fft, GLshort *buffer, unsigned frames)
 void glfft_render(glfft_t *fft, GLuint backbuffer, unsigned width, unsigned height)
 {
    fft->render(backbuffer, width, height);
+}
+
+void glfft_init_multisample(glfft_t *fft, unsigned width, unsigned height, unsigned samples)
+{
+   fft->init_multisample(width, height, samples);
 }
 
