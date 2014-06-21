@@ -755,12 +755,7 @@ static void do_audio_out(AVFormatContext *s, OutputStream *ost,
     update_benchmark("encode_audio %d.%d", ost->file_index, ost->index);
 
     if (got_packet) {
-        if (pkt.pts != AV_NOPTS_VALUE)
-            pkt.pts      = av_rescale_q(pkt.pts,      enc->time_base, ost->st->time_base);
-        if (pkt.dts != AV_NOPTS_VALUE)
-            pkt.dts      = av_rescale_q(pkt.dts,      enc->time_base, ost->st->time_base);
-        if (pkt.duration > 0)
-            pkt.duration = av_rescale_q(pkt.duration, enc->time_base, ost->st->time_base);
+        av_packet_rescale_ts(&pkt, enc->time_base, ost->st->time_base);
 
         if (debug_ts) {
             av_log(NULL, AV_LOG_INFO, "encoder -> type:audio "
@@ -810,6 +805,8 @@ static void do_subtitle_out(AVFormatContext *s,
     if (output_files[ost->file_index]->start_time != AV_NOPTS_VALUE)
         pts -= output_files[ost->file_index]->start_time;
     for (i = 0; i < nb; i++) {
+        unsigned save_num_rects = sub->num_rects;
+
         ost->sync_opts = av_rescale_q(pts, AV_TIME_BASE_Q, enc->time_base);
         if (!check_recording_time(ost))
             return;
@@ -826,6 +823,8 @@ static void do_subtitle_out(AVFormatContext *s,
 
         subtitle_out_size = avcodec_encode_subtitle(enc, subtitle_out,
                                                     subtitle_out_max_size, sub);
+        if (i == 1)
+            sub->num_rects = save_num_rects;
         if (subtitle_out_size < 0) {
             av_log(NULL, AV_LOG_FATAL, "Subtitle encoding failed\n");
             exit_program(1);
@@ -1052,10 +1051,7 @@ static void do_video_out(AVFormatContext *s,
             if (pkt.pts == AV_NOPTS_VALUE && !(enc->codec->capabilities & CODEC_CAP_DELAY))
                 pkt.pts = ost->sync_opts;
 
-            if (pkt.pts != AV_NOPTS_VALUE)
-                pkt.pts = av_rescale_q(pkt.pts, enc->time_base, ost->st->time_base);
-            if (pkt.dts != AV_NOPTS_VALUE)
-                pkt.dts = av_rescale_q(pkt.dts, enc->time_base, ost->st->time_base);
+            av_packet_rescale_ts(&pkt, enc->time_base, ost->st->time_base);
 
             if (debug_ts) {
                 av_log(NULL, AV_LOG_INFO, "encoder -> type:video "
@@ -1564,12 +1560,7 @@ static void flush_encoders(void)
                     av_free_packet(&pkt);
                     continue;
                 }
-                if (pkt.pts != AV_NOPTS_VALUE)
-                    pkt.pts = av_rescale_q(pkt.pts, enc->time_base, ost->st->time_base);
-                if (pkt.dts != AV_NOPTS_VALUE)
-                    pkt.dts = av_rescale_q(pkt.dts, enc->time_base, ost->st->time_base);
-                if (pkt.duration > 0)
-                    pkt.duration = av_rescale_q(pkt.duration, enc->time_base, ost->st->time_base);
+                av_packet_rescale_ts(&pkt, enc->time_base, ost->st->time_base);
                 pkt_size = pkt.size;
                 write_frame(os, &pkt, ost);
                 if (ost->enc_ctx->codec_type == AVMEDIA_TYPE_VIDEO && vstats_filename) {
