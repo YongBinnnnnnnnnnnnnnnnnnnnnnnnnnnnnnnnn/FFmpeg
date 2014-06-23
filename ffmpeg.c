@@ -2147,6 +2147,8 @@ static int output_packet(InputStream *ist, const AVPacket *pkt)
         if (!got_output) {
             continue;
         }
+        if (got_output && !pkt)
+            break;
     }
 
     /* handle stream copy */
@@ -2185,7 +2187,7 @@ static int output_packet(InputStream *ist, const AVPacket *pkt)
         do_streamcopy(ist, ost, pkt);
     }
 
-    return 0;
+    return got_output;
 }
 
 static void print_sdp(void)
@@ -2281,6 +2283,8 @@ static int init_input_stream(int ist_index, char *error, int error_len)
         ist->dec_ctx->thread_safe_callbacks = 1;
 
         av_opt_set_int(ist->dec_ctx, "refcounted_frames", 1, 0);
+        if(ist->dec_ctx->codec_id == AV_CODEC_ID_DVB_SUBTITLE)
+            av_dict_set(&ist->decoder_opts, "compute_edt", "1", 0);
 
         if (!av_dict_get(ist->decoder_opts, "threads", NULL, 0))
             av_dict_set(&ist->decoder_opts, "threads", "auto", 0);
@@ -3313,12 +3317,14 @@ static int process_input(int file_index)
             if (exit_on_error)
                 exit_program(1);
         }
-        ifile->eof_reached = 1;
 
         for (i = 0; i < ifile->nb_streams; i++) {
             ist = input_streams[ifile->ist_index + i];
-            if (ist->decoding_needed)
-                output_packet(ist, NULL);
+            if (ist->decoding_needed) {
+                ret = output_packet(ist, NULL);
+                if (ret>0)
+                    return 0;
+            }
 
             /* mark all outputs that don't go through lavfi as finished */
             for (j = 0; j < nb_output_streams; j++) {
@@ -3330,6 +3336,7 @@ static int process_input(int file_index)
             }
         }
 
+        ifile->eof_reached = 1;
         return AVERROR(EAGAIN);
     }
 
