@@ -36,6 +36,7 @@
 #include "h264chroma.h"
 #include "h263dsp.h"
 #include "hpeldsp.h"
+#include "mpegvideodsp.h"
 #include "put_bits.h"
 #include "ratecontrol.h"
 #include "parser.h"
@@ -361,6 +362,7 @@ typedef struct MpegEncContext {
     DSPContext dsp;             ///< pointers for accelerated dsp functions
     H264ChromaContext h264chroma;
     HpelDSPContext hdsp;
+    MpegVideoDSPContext mdsp;
     QpelDSPContext qdsp;
     VideoDSPContext vdsp;
     H263DSPContext h263dsp;
@@ -753,12 +755,9 @@ void ff_MPV_report_decode_progress(MpegEncContext *s);
 int ff_mpeg_update_thread_context(AVCodecContext *dst, const AVCodecContext *src);
 void ff_set_qscale(MpegEncContext * s, int qscale);
 
-/* Error resilience */
-void ff_mpeg_er_frame_start(MpegEncContext *s);
-
 int ff_dct_common_init(MpegEncContext *s);
 int ff_dct_encode_init(MpegEncContext *s);
-void ff_convert_matrix(DSPContext *dsp, int (*qmat)[64], uint16_t (*qmat16)[2][64],
+void ff_convert_matrix(MpegEncContext *s, int (*qmat)[64], uint16_t (*qmat16)[2][64],
                        const uint16_t *quant_matrix, int bias, int qmin, int qmax, int intra);
 int ff_dct_quantize_c(MpegEncContext *s, int16_t *block, int n, int qscale, int *overflow);
 
