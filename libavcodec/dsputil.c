@@ -26,150 +26,15 @@
  */
 
 #include "libavutil/attributes.h"
-#include "libavutil/imgutils.h"
 #include "libavutil/internal.h"
 #include "avcodec.h"
 #include "copy_block.h"
-#include "dct.h"
 #include "dsputil.h"
 #include "simple_idct.h"
-#include "faandct.h"
-#include "faanidct.h"
-#include "imgconvert.h"
-#include "mathops.h"
 #include "mpegvideo.h"
 #include "config.h"
 
 uint32_t ff_square_tab[512] = { 0, };
-
-#define BIT_DEPTH 16
-#include "dsputilenc_template.c"
-#undef BIT_DEPTH
-
-#define BIT_DEPTH 8
-#include "dsputilenc_template.c"
-
-av_cold void ff_init_scantable(uint8_t *permutation, ScanTable *st,
-                               const uint8_t *src_scantable)
-{
-    int i, end;
-
-    st->scantable = src_scantable;
-
-    for (i = 0; i < 64; i++) {
-        int j = src_scantable[i];
-        st->permutated[i] = permutation[j];
-    }
-
-    end = -1;
-    for (i = 0; i < 64; i++) {
-        int j = st->permutated[i];
-        if (j > end)
-            end = j;
-        st->raster_end[i] = end;
-    }
-}
-
-av_cold void ff_init_scantable_permutation(uint8_t *idct_permutation,
-                                           int idct_permutation_type)
-{
-    int i;
-
-    if (ARCH_X86)
-        if (ff_init_scantable_permutation_x86(idct_permutation,
-                                              idct_permutation_type))
-            return;
-
-    switch (idct_permutation_type) {
-    case FF_NO_IDCT_PERM:
-        for (i = 0; i < 64; i++)
-            idct_permutation[i] = i;
-        break;
-    case FF_LIBMPEG2_IDCT_PERM:
-        for (i = 0; i < 64; i++)
-            idct_permutation[i] = (i & 0x38) | ((i & 6) >> 1) | ((i & 1) << 2);
-        break;
-    case FF_TRANSPOSE_IDCT_PERM:
-        for (i = 0; i < 64; i++)
-            idct_permutation[i] = ((i & 7) << 3) | (i >> 3);
-        break;
-    case FF_PARTTRANS_IDCT_PERM:
-        for (i = 0; i < 64; i++)
-            idct_permutation[i] = (i & 0x24) | ((i & 3) << 3) | ((i >> 3) & 3);
-        break;
-    default:
-        av_log(NULL, AV_LOG_ERROR,
-               "Internal error, IDCT permutation not set\n");
-    }
-}
-
-static int pix_sum_c(uint8_t *pix, int line_size)
-{
-    int s = 0, i, j;
-
-    for (i = 0; i < 16; i++) {
-        for (j = 0; j < 16; j += 8) {
-            s   += pix[0];
-            s   += pix[1];
-            s   += pix[2];
-            s   += pix[3];
-            s   += pix[4];
-            s   += pix[5];
-            s   += pix[6];
-            s   += pix[7];
-            pix += 8;
-        }
-        pix += line_size - 16;
-    }
-    return s;
-}
-
-static int pix_norm1_c(uint8_t *pix, int line_size)
-{
-    int s = 0, i, j;
-    uint32_t *sq = ff_square_tab + 256;
-
-    for (i = 0; i < 16; i++) {
-        for (j = 0; j < 16; j += 8) {
-#if 0
-            s += sq[pix[0]];
-            s += sq[pix[1]];
-            s += sq[pix[2]];
-            s += sq[pix[3]];
-            s += sq[pix[4]];
-            s += sq[pix[5]];
-            s += sq[pix[6]];
-            s += sq[pix[7]];
-#else
-#if HAVE_FAST_64BIT
-            register uint64_t x = *(uint64_t *) pix;
-            s += sq[x         & 0xff];
-            s += sq[(x >>  8) & 0xff];
-            s += sq[(x >> 16) & 0xff];
-            s += sq[(x >> 24) & 0xff];
-            s += sq[(x >> 32) & 0xff];
-            s += sq[(x >> 40) & 0xff];
-            s += sq[(x >> 48) & 0xff];
-            s += sq[(x >> 56) & 0xff];
-#else
-            register uint32_t x = *(uint32_t *) pix;
-            s += sq[x         & 0xff];
-            s += sq[(x >>  8) & 0xff];
-            s += sq[(x >> 16) & 0xff];
-            s += sq[(x >> 24) & 0xff];
-            x  = *(uint32_t *) (pix + 4);
-            s += sq[x         & 0xff];
-            s += sq[(x >>  8) & 0xff];
-            s += sq[(x >> 16) & 0xff];
-            s += sq[(x >> 24) & 0xff];
-#endif
-#endif
-            pix += 8;
-        }
-        pix += line_size - 16;
-    }
-    return s;
-}
 
 static int sse4_c(MpegEncContext *v, uint8_t *pix1, uint8_t *pix2,
                   int line_size, int h)
@@ -237,151 +102,6 @@ static int sse16_c(MpegEncContext *v, uint8_t *pix1, uint8_t *pix2,
         pix2 += line_size;
     }
     return s;
-}
-
-static void diff_pixels_c(int16_t *av_restrict block, const uint8_t *s1,
-                          const uint8_t *s2, int stride)
-{
-    int i;
-
-    /* read the pixels */
-    for (i = 0; i < 8; i++) {
-        block[0] = s1[0] - s2[0];
-        block[1] = s1[1] - s2[1];
-        block[2] = s1[2] - s2[2];
-        block[3] = s1[3] - s2[3];
-        block[4] = s1[4] - s2[4];
-        block[5] = s1[5] - s2[5];
-        block[6] = s1[6] - s2[6];
-        block[7] = s1[7] - s2[7];
-        s1      += stride;
-        s2      += stride;
-        block   += 8;
-    }
-}
-
-static void put_pixels_clamped_c(const int16_t *block, uint8_t *av_restrict pixels,
-                                 int line_size)
-{
-    int i;
-
-    /* read the pixels */
-    for (i = 0; i < 8; i++) {
-        pixels[0] = av_clip_uint8(block[0]);
-        pixels[1] = av_clip_uint8(block[1]);
-        pixels[2] = av_clip_uint8(block[2]);
-        pixels[3] = av_clip_uint8(block[3]);
-        pixels[4] = av_clip_uint8(block[4]);
-        pixels[5] = av_clip_uint8(block[5]);
-        pixels[6] = av_clip_uint8(block[6]);
-        pixels[7] = av_clip_uint8(block[7]);
-
-        pixels += line_size;
-        block  += 8;
-    }
-}
-
-static void put_pixels_clamped4_c(const int16_t *block, uint8_t *av_restrict pixels,
-                                 int line_size)
-{
-    int i;
-
-    /* read the pixels */
-    for(i=0;i<4;i++) {
-        pixels[0] = av_clip_uint8(block[0]);
-        pixels[1] = av_clip_uint8(block[1]);
-        pixels[2] = av_clip_uint8(block[2]);
-        pixels[3] = av_clip_uint8(block[3]);
-
-        pixels += line_size;
-        block += 8;
-    }
-}
-
-static void put_pixels_clamped2_c(const int16_t *block, uint8_t *av_restrict pixels,
-                                 int line_size)
-{
-    int i;
-
-    /* read the pixels */
-    for(i=0;i<2;i++) {
-        pixels[0] = av_clip_uint8(block[0]);
-        pixels[1] = av_clip_uint8(block[1]);
-
-        pixels += line_size;
-        block += 8;
-    }
-}
-
-static void put_signed_pixels_clamped_c(const int16_t *block,
-                                        uint8_t *av_restrict pixels,
-                                        int line_size)
-{
-    int i, j;
-
-    for (i = 0; i < 8; i++) {
-        for (j = 0; j < 8; j++) {
-            if (*block < -128)
-                *pixels = 0;
-            else if (*block > 127)
-                *pixels = 255;
-            else
-                *pixels = (uint8_t) (*block + 128);
-            block++;
-            pixels++;
-        }
-        pixels += (line_size - 8);
-    }
-}
-
-static void add_pixels_clamped_c(const int16_t *block, uint8_t *av_restrict pixels,
-                                 int line_size)
-{
-    int i;
-
-    /* read the pixels */
-    for (i = 0; i < 8; i++) {
-        pixels[0] = av_clip_uint8(pixels[0] + block[0]);
-        pixels[1] = av_clip_uint8(pixels[1] + block[1]);
-        pixels[2] = av_clip_uint8(pixels[2] + block[2]);
-        pixels[3] = av_clip_uint8(pixels[3] + block[3]);
-        pixels[4] = av_clip_uint8(pixels[4] + block[4]);
-        pixels[5] = av_clip_uint8(pixels[5] + block[5]);
-        pixels[6] = av_clip_uint8(pixels[6] + block[6]);
-        pixels[7] = av_clip_uint8(pixels[7] + block[7]);
-        pixels   += line_size;
-        block    += 8;
-    }
-}
-
-static void add_pixels_clamped4_c(const int16_t *block, uint8_t *av_restrict pixels,
-                          int line_size)
-{
-    int i;
-
-    /* read the pixels */
-    for(i=0;i<4;i++) {
-        pixels[0] = av_clip_uint8(pixels[0] + block[0]);
-        pixels[1] = av_clip_uint8(pixels[1] + block[1]);
-        pixels[2] = av_clip_uint8(pixels[2] + block[2]);
-        pixels[3] = av_clip_uint8(pixels[3] + block[3]);
-        pixels += line_size;
-        block += 8;
-    }
-}
-
-static void add_pixels_clamped2_c(const int16_t *block, uint8_t *av_restrict pixels,
-                          int line_size)
-{
-    int i;
-
-    /* read the pixels */
-    for(i=0;i<2;i++) {
-        pixels[0] = av_clip_uint8(pixels[0] + block[0]);
-        pixels[1] = av_clip_uint8(pixels[1] + block[1]);
-        pixels += line_size;
-        block += 8;
-    }
 }
 
 static int sum_abs_dctelem_c(int16_t *block)
@@ -644,35 +364,6 @@ static int nsse8_c(MpegEncContext *c, uint8_t *s1, uint8_t *s2, int stride, int 
         return score1 + FFABS(score2) * 8;
 }
 
-static int try_8x8basis_c(int16_t rem[64], int16_t weight[64],
-                          int16_t basis[64], int scale)
-{
-    int i;
-    unsigned int sum = 0;
-
-    for (i = 0; i < 8 * 8; i++) {
-        int b = rem[i] + ((basis[i] * scale +
-                           (1 << (BASIS_SHIFT - RECON_SHIFT - 1))) >>
-                          (BASIS_SHIFT - RECON_SHIFT));
-        int w = weight[i];
-        b >>= RECON_SHIFT;
-        av_assert2(-512 < b && b < 512);
-
-        sum += (w * b) * (w * b) >> 4;
-    }
-    return sum >> 2;
-}
-
-static void add_8x8basis_c(int16_t rem[64], int16_t basis[64], int scale)
-{
-    int i;
-
-    for (i = 0; i < 8 * 8; i++)
-        rem[i] += (basis[i] * scale +
-                   (1 << (BASIS_SHIFT - RECON_SHIFT - 1))) >>
-                  (BASIS_SHIFT - RECON_SHIFT);
-}
-
 static int zero_cmp(MpegEncContext *s, uint8_t *a, uint8_t *b,
                     int stride, int h)
 {
@@ -867,8 +558,8 @@ static int dct_sad8x8_c(MpegEncContext *s, uint8_t *src1,
 
     av_assert2(h == 8);
 
-    s->dsp.diff_pixels(temp, src1, src2, stride);
-    s->dsp.fdct(temp);
+    s->pdsp.diff_pixels(temp, src1, src2, stride);
+    s->fdsp.fdct(temp);
     return s->dsp.sum_abs_dctelem(temp);
 }
 
@@ -907,7 +598,7 @@ static int dct264_sad8x8_c(MpegEncContext *s, uint8_t *src1,
     int16_t dct[8][8];
     int i, sum = 0;
 
-    s->dsp.diff_pixels(dct[0], src1, src2, stride);
+    s->pdsp.diff_pixels(dct[0], src1, src2, stride);
 
 #define SRC(x) dct[i][x]
 #define DST(x, v) dct[i][x] = v
@@ -934,8 +625,8 @@ static int dct_max8x8_c(MpegEncContext *s, uint8_t *src1,
 
     av_assert2(h == 8);
 
-    s->dsp.diff_pixels(temp, src1, src2, stride);
-    s->dsp.fdct(temp);
+    s->pdsp.diff_pixels(temp, src1, src2, stride);
+    s->fdsp.fdct(temp);
 
     for (i = 0; i < 64; i++)
         sum = FFMAX(sum, FFABS(temp[i]));
@@ -953,7 +644,7 @@ static int quant_psnr8x8_c(MpegEncContext *s, uint8_t *src1,
     av_assert2(h == 8);
     s->mb_intra = 0;
 
-    s->dsp.diff_pixels(temp, src1, src2, stride);
+    s->pdsp.diff_pixels(temp, src1, src2, stride);
 
     memcpy(bak, temp, 64 * sizeof(int16_t));
 
@@ -984,7 +675,7 @@ static int rd8x8_c(MpegEncContext *s, uint8_t *src1, uint8_t *src2,
     copy_block8(lsrc1, src1, 8, stride, 8);
     copy_block8(lsrc2, src2, 8, stride, 8);
 
-    s->dsp.diff_pixels(temp, lsrc1, lsrc2, 8);
+    s->pdsp.diff_pixels(temp, lsrc1, lsrc2, 8);
 
     s->block_last_index[0 /* FIXME */] =
     last                               =
@@ -1038,7 +729,7 @@ static int rd8x8_c(MpegEncContext *s, uint8_t *src1, uint8_t *src2,
             s->dct_unquantize_inter(s, temp, 0, s->qscale);
     }
 
-    s->dsp.idct_add(lsrc2, 8, temp);
+    s->idsp.idct_add(lsrc2, 8, temp);
 
     distortion = s->dsp.sse[1](NULL, lsrc2, lsrc1, 8, 8);
 
@@ -1056,7 +747,7 @@ static int bit8x8_c(MpegEncContext *s, uint8_t *src1, uint8_t *src2,
 
     av_assert2(h == 8);
 
-    s->dsp.diff_pixels(temp, src1, src2, stride);
+    s->pdsp.diff_pixels(temp, src1, src2, stride);
 
     s->block_last_index[0 /* FIXME */] =
     last                               =
@@ -1216,77 +907,6 @@ WRAPPER8_16_SQ(quant_psnr8x8_c, quant_psnr16_c)
 WRAPPER8_16_SQ(rd8x8_c, rd16_c)
 WRAPPER8_16_SQ(bit8x8_c, bit16_c)
 
-static void jref_idct_put(uint8_t *dest, int line_size, int16_t *block)
-{
-    ff_j_rev_dct(block);
-    put_pixels_clamped_c(block, dest, line_size);
-}
-
-static void jref_idct_add(uint8_t *dest, int line_size, int16_t *block)
-{
-    ff_j_rev_dct(block);
-    add_pixels_clamped_c(block, dest, line_size);
-}
-
-static void ff_jref_idct4_put(uint8_t *dest, int line_size, int16_t *block)
-{
-    ff_j_rev_dct4 (block);
-    put_pixels_clamped4_c(block, dest, line_size);
-}
-static void ff_jref_idct4_add(uint8_t *dest, int line_size, int16_t *block)
-{
-    ff_j_rev_dct4 (block);
-    add_pixels_clamped4_c(block, dest, line_size);
-}
-
-static void ff_jref_idct2_put(uint8_t *dest, int line_size, int16_t *block)
-{
-    ff_j_rev_dct2 (block);
-    put_pixels_clamped2_c(block, dest, line_size);
-}
-static void ff_jref_idct2_add(uint8_t *dest, int line_size, int16_t *block)
-{
-    ff_j_rev_dct2 (block);
-    add_pixels_clamped2_c(block, dest, line_size);
-}
-
-static void ff_jref_idct1_put(uint8_t *dest, int line_size, int16_t *block)
-{
-    dest[0] = av_clip_uint8((block[0] + 4)>>3);
-}
-static void ff_jref_idct1_add(uint8_t *dest, int line_size, int16_t *block)
-{
-    dest[0] = av_clip_uint8(dest[0] + ((block[0] + 4)>>3));
-}
-
-/* draw the edges of width 'w' of an image of size width, height */
-// FIXME: Check that this is OK for MPEG-4 interlaced.
-static void draw_edges_8_c(uint8_t *buf, int wrap, int width, int height,
-                           int w, int h, int sides)
-{
-    uint8_t *ptr = buf, *last_line;
-    int i;
-
-    /* left and right */
-    for (i = 0; i < height; i++) {
-        memset(ptr - w, ptr[0], w);
-        memset(ptr + width, ptr[width - 1], w);
-        ptr += wrap;
-    }
-
-    /* top and bottom + corners */
-    buf -= w;
-    last_line = buf + (height - 1) * wrap;
-    if (sides & EDGE_TOP)
-        for (i = 0; i < h; i++)
-            // top
-            memcpy(buf - (i + 1) * wrap, buf, width + w + w);
-    if (sides & EDGE_BOTTOM)
-        for (i = 0; i < h; i++)
-            // bottom
-            memcpy(last_line + (i + 1) * wrap, last_line, width + w + w);
-}
-
 /* init static data */
 av_cold void ff_dsputil_static_init(void)
 {
@@ -1323,80 +943,7 @@ av_cold void ff_dsputil_init(DSPContext *c, AVCodecContext *avctx)
 
     ff_check_alignment();
 
-#if CONFIG_ENCODERS
-    if (avctx->bits_per_raw_sample == 10) {
-        c->fdct    = ff_jpeg_fdct_islow_10;
-        c->fdct248 = ff_fdct248_islow_10;
-    } else {
-        if (avctx->dct_algo == FF_DCT_FASTINT) {
-            c->fdct    = ff_fdct_ifast;
-            c->fdct248 = ff_fdct_ifast248;
-        } else if (avctx->dct_algo == FF_DCT_FAAN) {
-            c->fdct    = ff_faandct;
-            c->fdct248 = ff_faandct248;
-        } else {
-            c->fdct    = ff_jpeg_fdct_islow_8; // slow/accurate/default
-            c->fdct248 = ff_fdct248_islow_8;
-        }
-    }
-#endif /* CONFIG_ENCODERS */
-
-    if (avctx->lowres==1) {
-        c->idct_put              = ff_jref_idct4_put;
-        c->idct_add              = ff_jref_idct4_add;
-        c->idct                  = ff_j_rev_dct4;
-        c->idct_permutation_type = FF_NO_IDCT_PERM;
-    } else if (avctx->lowres==2) {
-        c->idct_put              =  ff_jref_idct2_put;
-        c->idct_add              =  ff_jref_idct2_add;
-        c->idct                  =  ff_j_rev_dct2;
-        c->idct_permutation_type = FF_NO_IDCT_PERM;
-    } else if (avctx->lowres==3) {
-        c->idct_put              =  ff_jref_idct1_put;
-        c->idct_add              =  ff_jref_idct1_add;
-        c->idct                  =  ff_j_rev_dct1;
-        c->idct_permutation_type = FF_NO_IDCT_PERM;
-    } else {
-        if (avctx->bits_per_raw_sample == 10) {
-            c->idct_put              = ff_simple_idct_put_10;
-            c->idct_add              = ff_simple_idct_add_10;
-            c->idct                  = ff_simple_idct_10;
-            c->idct_permutation_type = FF_NO_IDCT_PERM;
-        } else if (avctx->bits_per_raw_sample == 12) {
-            c->idct_put              = ff_simple_idct_put_12;
-            c->idct_add              = ff_simple_idct_add_12;
-            c->idct                  = ff_simple_idct_12;
-            c->idct_permutation_type = FF_NO_IDCT_PERM;
-        } else {
-        if (avctx->idct_algo == FF_IDCT_INT) {
-            c->idct_put              = jref_idct_put;
-            c->idct_add              = jref_idct_add;
-            c->idct                  = ff_j_rev_dct;
-            c->idct_permutation_type = FF_LIBMPEG2_IDCT_PERM;
-        } else if (avctx->idct_algo == FF_IDCT_FAAN) {
-            c->idct_put              = ff_faanidct_put;
-            c->idct_add              = ff_faanidct_add;
-            c->idct                  = ff_faanidct;
-            c->idct_permutation_type = FF_NO_IDCT_PERM;
-        } else { // accurate/default
-            c->idct_put              = ff_simple_idct_put_8;
-            c->idct_add              = ff_simple_idct_add_8;
-            c->idct                  = ff_simple_idct_8;
-            c->idct_permutation_type = FF_NO_IDCT_PERM;
-        }
-        }
-    }
-
-    c->diff_pixels = diff_pixels_c;
-
-    c->put_pixels_clamped        = put_pixels_clamped_c;
-    c->put_signed_pixels_clamped = put_signed_pixels_clamped_c;
-    c->add_pixels_clamped        = add_pixels_clamped_c;
-
     c->sum_abs_dctelem = sum_abs_dctelem_c;
-
-    c->pix_sum   = pix_sum_c;
-    c->pix_norm1 = pix_norm1_c;
 
     /* TODO [0] 16  [1] 8 */
     c->pix_abs[0][0] = pix_abs16_c;
@@ -1442,31 +989,6 @@ av_cold void ff_dsputil_init(DSPContext *c, AVCodecContext *avctx)
     ff_dsputil_init_dwt(c);
 #endif
 
-    c->try_8x8basis = try_8x8basis_c;
-    c->add_8x8basis = add_8x8basis_c;
-
-    c->shrink[0] = av_image_copy_plane;
-    c->shrink[1] = ff_shrink22;
-    c->shrink[2] = ff_shrink44;
-    c->shrink[3] = ff_shrink88;
-
-    c->draw_edges = draw_edges_8_c;
-
-    switch (avctx->bits_per_raw_sample) {
-    case 9:
-    case 10:
-    case 12:
-    case 14:
-        c->get_pixels = get_pixels_16_c;
-        break;
-    default:
-        if (avctx->bits_per_raw_sample<=8 || avctx->codec_type != AVMEDIA_TYPE_VIDEO) {
-            c->get_pixels = get_pixels_8_c;
-        }
-        break;
-    }
-
-
     if (ARCH_ALPHA)
         ff_dsputil_init_alpha(c, avctx);
     if (ARCH_ARM)
@@ -1475,9 +997,6 @@ av_cold void ff_dsputil_init(DSPContext *c, AVCodecContext *avctx)
         ff_dsputil_init_ppc(c, avctx, high_bit_depth);
     if (ARCH_X86)
         ff_dsputil_init_x86(c, avctx, high_bit_depth);
-
-    ff_init_scantable_permutation(c->idct_permutation,
-                                  c->idct_permutation_type);
 }
 
 av_cold void dsputil_init(DSPContext* c, AVCodecContext *avctx)

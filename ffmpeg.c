@@ -2864,7 +2864,11 @@ static int transcode_init(void)
                 av_log(NULL, AV_LOG_WARNING, "The bitrate parameter is set too low."
                                              " It takes bits/s as argument, not kbits/s\n");
         } else {
-            av_opt_set_dict(ost->enc_ctx, &ost->encoder_opts);
+            if (av_opt_set_dict(ost->enc_ctx, &ost->encoder_opts) < 0) {
+                av_log(NULL, AV_LOG_FATAL,
+                    "Error setting up codec context options.\n");
+                exit_program(1);
+            }
         }
 
         ret = avcodec_copy_context(ost->st->codec, ost->enc_ctx);
@@ -2874,6 +2878,9 @@ static int transcode_init(void)
             exit_program(1);
         }
         ost->st->codec->codec= ost->enc_ctx->codec;
+
+        // copy timebase while removing common factors
+        ost->st->time_base = av_add_q(ost->enc_ctx->time_base, (AVRational){0});
     }
 
     /* init input streams */

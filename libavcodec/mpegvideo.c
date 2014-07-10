@@ -34,8 +34,8 @@
 #include "libavutil/timer.h"
 #include "avcodec.h"
 #include "blockdsp.h"
-#include "dsputil.h"
 #include "h264chroma.h"
+#include "idctdsp.h"
 #include "internal.h"
 #include "mathops.h"
 #include "mpegutils.h"
@@ -383,6 +383,7 @@ av_cold int ff_dct_common_init(MpegEncContext *s)
     ff_dsputil_init(&s->dsp, s->avctx);
     ff_h264chroma_init(&s->h264chroma, 8); //for lowres
     ff_hpeldsp_init(&s->hdsp, s->avctx->flags);
+    ff_idctdsp_init(&s->idsp, s->avctx);
     ff_mpegvideodsp_init(&s->mdsp);
     ff_videodsp_init(&s->vdsp, s->avctx->bits_per_raw_sample);
 
@@ -421,14 +422,14 @@ av_cold int ff_dct_common_init(MpegEncContext *s)
      * note: only wmv uses different ones
      */
     if (s->alternate_scan) {
-        ff_init_scantable(s->dsp.idct_permutation, &s->inter_scantable  , ff_alternate_vertical_scan);
-        ff_init_scantable(s->dsp.idct_permutation, &s->intra_scantable  , ff_alternate_vertical_scan);
+        ff_init_scantable(s->idsp.idct_permutation, &s->inter_scantable, ff_alternate_vertical_scan);
+        ff_init_scantable(s->idsp.idct_permutation, &s->intra_scantable, ff_alternate_vertical_scan);
     } else {
-        ff_init_scantable(s->dsp.idct_permutation, &s->inter_scantable  , ff_zigzag_direct);
-        ff_init_scantable(s->dsp.idct_permutation, &s->intra_scantable  , ff_zigzag_direct);
+        ff_init_scantable(s->idsp.idct_permutation, &s->inter_scantable, ff_zigzag_direct);
+        ff_init_scantable(s->idsp.idct_permutation, &s->intra_scantable, ff_zigzag_direct);
     }
-    ff_init_scantable(s->dsp.idct_permutation, &s->intra_h_scantable, ff_alternate_horizontal_scan);
-    ff_init_scantable(s->dsp.idct_permutation, &s->intra_v_scantable, ff_alternate_vertical_scan);
+    ff_init_scantable(s->idsp.idct_permutation, &s->intra_h_scantable, ff_alternate_horizontal_scan);
+    ff_init_scantable(s->idsp.idct_permutation, &s->intra_v_scantable, ff_alternate_vertical_scan);
 
     return 0;
 }
@@ -1974,6 +1975,29 @@ void ff_MPV_frame_end(MpegEncContext *s)
         ff_thread_report_progress(&s->current_picture_ptr->tf, INT_MAX, 0);
 }
 
+
+static int clip_line(int *sx, int *sy, int *ex, int *ey, int maxx)
+{
+    if(*sx > *ex)
+        return clip_line(ex, ey, sx, sy, maxx);
+
+    if (*sx < 0) {
+        if (*ex < 0)
+            return 1;
+        *sy = *ey + (*sy - *ey) * (int64_t)*ex / (*ex - *sx);
+        *sx = 0;
+    }
+
+    if (*ex > maxx) {
+        if (*sx > maxx)
+            return 1;
+        *ey = *sy + (*ey - *sy) * (int64_t)(maxx - *sx) / (*ex - *sx);
+        *ex = maxx;
+    }
+    return 0;
+}
+
+
 /**
  * Draw a line from (ex, ey) -> (sx, sy).
  * @param w width of the image
@@ -1985,6 +2009,11 @@ static void draw_line(uint8_t *buf, int sx, int sy, int ex, int ey,
                       int w, int h, int stride, int color)
 {
     int x, y, fr, f;
+
+    if (clip_line(&sx, &sy, &ex, &ey, w - 1))
+        return;
+    if (clip_line(&sy, &sx, &ey, &ex, h - 1))
+        return;
 
     sx = av_clip(sx, 0, w - 1);
     sy = av_clip(sy, 0, h - 1);
@@ -2035,9 +2064,14 @@ static void draw_line(uint8_t *buf, int sx, int sy, int ex, int ey,
  * @param color color of the arrow
  */
 static void draw_arrow(uint8_t *buf, int sx, int sy, int ex,
-                       int ey, int w, int h, int stride, int color)
+                       int ey, int w, int h, int stride, int color, int tail, int direction)
 {
     int dx,dy;
+
+    if (direction) {
+        FFSWAP(int, sx, ex);
+        FFSWAP(int, sy, ey);
+    }
 
     sx = av_clip(sx, -100, w + 100);
     sy = av_clip(sy, -100, h + 100);
@@ -2055,6 +2089,11 @@ static void draw_arrow(uint8_t *buf, int sx, int sy, int ex,
         // FIXME subpixel accuracy
         rx = ROUNDED_DIV(rx * 3 << 4, length);
         ry = ROUNDED_DIV(ry * 3 << 4, length);
+
+        if (tail) {
+            rx = -rx;
+            ry = -ry;
+        }
 
         draw_line(buf, sx, sy, sx + rx, sy + ry, w, h, stride, color);
         draw_line(buf, sx, sy, sx - ry, sy + rx, w, h, stride, color);
@@ -2209,7 +2248,7 @@ void ff_print_debug_info2(AVCodecContext *avctx, AVFrame *pict, uint8_t *mbskip_
                                 int mx = (motion_val[direction][xy][0] >> shift) + sx;
                                 int my = (motion_val[direction][xy][1] >> shift) + sy;
                                 draw_arrow(ptr, sx, sy, mx, my, width,
-                                           height, pict->linesize[0], 100);
+                                           height, pict->linesize[0], 100, 0, direction);
                             }
                         } else if (IS_16X8(mbtype_table[mb_index])) {
                             int i;
@@ -2223,8 +2262,8 @@ void ff_print_debug_info2(AVCodecContext *avctx, AVFrame *pict, uint8_t *mbskip_
                                 if (IS_INTERLACED(mbtype_table[mb_index]))
                                     my *= 2;
 
-                            draw_arrow(ptr, sx, sy, mx + sx, my + sy, width,
-                                       height, pict->linesize[0], 100);
+                                draw_arrow(ptr, sx, sy, mx + sx, my + sy, width,
+                                           height, pict->linesize[0], 100, 0, direction);
                             }
                         } else if (IS_8X16(mbtype_table[mb_index])) {
                             int i;
@@ -2239,7 +2278,7 @@ void ff_print_debug_info2(AVCodecContext *avctx, AVFrame *pict, uint8_t *mbskip_
                                     my *= 2;
 
                                 draw_arrow(ptr, sx, sy, mx + sx, my + sy, width,
-                                           height, pict->linesize[0], 100);
+                                           height, pict->linesize[0], 100, 0, direction);
                             }
                         } else {
                               int sx= mb_x * 16 + 8;
@@ -2247,7 +2286,7 @@ void ff_print_debug_info2(AVCodecContext *avctx, AVFrame *pict, uint8_t *mbskip_
                               int xy= (mb_x + mb_y * mv_stride) << mv_sample_log2;
                               int mx= (motion_val[direction][xy][0]>>shift) + sx;
                               int my= (motion_val[direction][xy][1]>>shift) + sy;
-                              draw_arrow(ptr, sx, sy, mx, my, width, height, pict->linesize[0], 100);
+                              draw_arrow(ptr, sx, sy, mx, my, width, height, pict->linesize[0], 100, 0, direction);
                         }
                     }
                 }
@@ -2797,7 +2836,7 @@ static inline void put_dct(MpegEncContext *s,
                            int16_t *block, int i, uint8_t *dest, int line_size, int qscale)
 {
     s->dct_unquantize_intra(s, block, i, qscale);
-    s->dsp.idct_put (dest, line_size, block);
+    s->idsp.idct_put(dest, line_size, block);
 }
 
 /* add block[] to dest[] */
@@ -2805,7 +2844,7 @@ static inline void add_dct(MpegEncContext *s,
                            int16_t *block, int i, uint8_t *dest, int line_size)
 {
     if (s->block_last_index[i] >= 0) {
-        s->dsp.idct_add (dest, line_size, block);
+        s->idsp.idct_add(dest, line_size, block);
     }
 }
 
@@ -2815,7 +2854,7 @@ static inline void add_dequant_dct(MpegEncContext *s,
     if (s->block_last_index[i] >= 0) {
         s->dct_unquantize_inter(s, block, i, qscale);
 
-        s->dsp.idct_add (dest, line_size, block);
+        s->idsp.idct_add(dest, line_size, block);
     }
 }
 
@@ -2880,7 +2919,8 @@ void MPV_decode_mb_internal(MpegEncContext *s, int16_t block[12][64],
        av_log(s->avctx, AV_LOG_DEBUG, "DCT coeffs of MB at %dx%d:\n", s->mb_x, s->mb_y);
        for(i=0; i<6; i++){
            for(j=0; j<64; j++){
-               av_log(s->avctx, AV_LOG_DEBUG, "%5d", block[i][s->dsp.idct_permutation[j]]);
+               av_log(s->avctx, AV_LOG_DEBUG, "%5d",
+                      block[i][s->idsp.idct_permutation[j]]);
            }
            av_log(s->avctx, AV_LOG_DEBUG, "\n");
        }
@@ -3071,29 +3111,29 @@ void MPV_decode_mb_internal(MpegEncContext *s, int16_t block[12][64],
                     }
                 }
             }else{
-                s->dsp.idct_put(dest_y                          , dct_linesize, block[0]);
-                s->dsp.idct_put(dest_y              + block_size, dct_linesize, block[1]);
-                s->dsp.idct_put(dest_y + dct_offset             , dct_linesize, block[2]);
-                s->dsp.idct_put(dest_y + dct_offset + block_size, dct_linesize, block[3]);
+                s->idsp.idct_put(dest_y,                           dct_linesize, block[0]);
+                s->idsp.idct_put(dest_y              + block_size, dct_linesize, block[1]);
+                s->idsp.idct_put(dest_y + dct_offset,              dct_linesize, block[2]);
+                s->idsp.idct_put(dest_y + dct_offset + block_size, dct_linesize, block[3]);
 
                 if(!CONFIG_GRAY || !(s->flags&CODEC_FLAG_GRAY)){
                     if(s->chroma_y_shift){
-                        s->dsp.idct_put(dest_cb, uvlinesize, block[4]);
-                        s->dsp.idct_put(dest_cr, uvlinesize, block[5]);
+                        s->idsp.idct_put(dest_cb, uvlinesize, block[4]);
+                        s->idsp.idct_put(dest_cr, uvlinesize, block[5]);
                     }else{
 
                         dct_linesize = uvlinesize << s->interlaced_dct;
                         dct_offset   = s->interlaced_dct ? uvlinesize : uvlinesize*block_size;
 
-                        s->dsp.idct_put(dest_cb,              dct_linesize, block[4]);
-                        s->dsp.idct_put(dest_cr,              dct_linesize, block[5]);
-                        s->dsp.idct_put(dest_cb + dct_offset, dct_linesize, block[6]);
-                        s->dsp.idct_put(dest_cr + dct_offset, dct_linesize, block[7]);
+                        s->idsp.idct_put(dest_cb,              dct_linesize, block[4]);
+                        s->idsp.idct_put(dest_cr,              dct_linesize, block[5]);
+                        s->idsp.idct_put(dest_cb + dct_offset, dct_linesize, block[6]);
+                        s->idsp.idct_put(dest_cr + dct_offset, dct_linesize, block[7]);
                         if(!s->chroma_x_shift){//Chroma444
-                            s->dsp.idct_put(dest_cb + block_size,              dct_linesize, block[8]);
-                            s->dsp.idct_put(dest_cr + block_size,              dct_linesize, block[9]);
-                            s->dsp.idct_put(dest_cb + block_size + dct_offset, dct_linesize, block[10]);
-                            s->dsp.idct_put(dest_cr + block_size + dct_offset, dct_linesize, block[11]);
+                            s->idsp.idct_put(dest_cb + block_size,              dct_linesize, block[8]);
+                            s->idsp.idct_put(dest_cr + block_size,              dct_linesize, block[9]);
+                            s->idsp.idct_put(dest_cb + block_size + dct_offset, dct_linesize, block[10]);
+                            s->idsp.idct_put(dest_cr + block_size + dct_offset, dct_linesize, block[11]);
                         }
                     }
                 }//gray
