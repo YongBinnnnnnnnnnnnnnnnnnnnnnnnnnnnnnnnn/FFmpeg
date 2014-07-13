@@ -1422,6 +1422,7 @@ CFLAGS +=  -DCONFIG_ERROR_RESILIENCE=1 -DCONFIG_MPEGVIDEO=1 -DCONFIG_MPEGVIDEOEN
 
 
 AVCODEC_BLACKLIST := \
+	$(AVCODEC_DIR)/libgsm.c \
 	$(AVCODEC_DIR)/libvo-aacenc.c \
 	$(AVCODEC_DIR)/libvo-amrwbenc.c \
 	$(AVCODEC_DIR)/dsputil_template.c \
