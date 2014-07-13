@@ -342,8 +342,7 @@ static int vsad16_mmxext(MpegEncContext *v, uint8_t *pix1, uint8_t *pix2,
 
 #endif /* HAVE_INLINE_ASM */
 
-av_cold void ff_dsputilenc_init_mmx(DSPContext *c, AVCodecContext *avctx,
-                                    unsigned high_bit_depth)
+av_cold void ff_dsputilenc_init_mmx(DSPContext *c, AVCodecContext *avctx)
 {
     int cpu_flags = av_get_cpu_flags();
 
@@ -363,14 +362,6 @@ av_cold void ff_dsputilenc_init_mmx(DSPContext *c, AVCodecContext *avctx,
             c->vsad[0] = vsad16_mmxext;
         }
     }
-
-    if (INLINE_SSE2(cpu_flags)) {
-    }
-
-#if HAVE_SSSE3_INLINE
-    if (INLINE_SSSE3(cpu_flags)) {
-    }
-#endif
 #endif /* HAVE_INLINE_ASM */
 
     if (EXTERNAL_MMX(cpu_flags)) {

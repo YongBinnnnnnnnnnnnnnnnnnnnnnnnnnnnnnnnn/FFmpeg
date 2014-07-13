@@ -137,6 +137,9 @@ struct MpegTSContext {
     /** to detect seek */
     int64_t last_pos;
 
+    int skip_changes;
+    int skip_clear;
+
     /******************************************/
     /* private mpegts data */
     /* scan context */
@@ -173,6 +176,10 @@ static const AVOption mpegts_options[] = {
      {.i64 = 1}, 0, 1, AV_OPT_FLAG_DECODING_PARAM },
     {"ts_packetsize", "Output option carrying the raw packet size.", offsetof(MpegTSContext, raw_packet_size), AV_OPT_TYPE_INT,
      {.i64 = 0}, 0, 0, AV_OPT_FLAG_DECODING_PARAM | AV_OPT_FLAG_EXPORT | AV_OPT_FLAG_READONLY },
+    {"skip_changes", "Skip changing / adding streams / programs.", offsetof(MpegTSContext, skip_changes), AV_OPT_TYPE_INT,
+     {.i64 = 0}, 0, 1, 0 },
+    {"skip_clear", "Skip clearing programs.", offsetof(MpegTSContext, skip_clear), AV_OPT_TYPE_INT,
+     {.i64 = 0}, 0, 1, 0 },
     { NULL },
 };
 
@@ -237,6 +244,7 @@ static void clear_avprogram(MpegTSContext *ts, unsigned int programid)
 {
     AVProgram *prg = NULL;
     int i;
+
     for (i = 0; i < ts->stream->nb_programs; i++)
         if (ts->stream->programs[i]->id == programid) {
             prg = ts->stream->programs[i];
@@ -952,6 +960,9 @@ static int mpegts_push_data(MpegTSFilter *filter,
 
                     /* stream not present in PMT */
                     if (!pes->st) {
+                        if (ts->skip_changes)
+                            goto skip;
+
                         pes->st = avformat_new_stream(ts->stream, NULL);
                         if (!pes->st)
                             return AVERROR(ENOMEM);
@@ -1721,6 +1732,8 @@ static void pmt_cb(MpegTSFilter *filter, const uint8_t *section, int section_len
 
     if (h->tid != PMT_TID)
         return;
+    if (ts->skip_changes)
+        return;
 
     clear_program(ts, h->id);
     pcr_pid = get16(&p, p_end);
@@ -1874,6 +1887,8 @@ static void pat_cb(MpegTSFilter *filter, const uint8_t *section, int section_len
         return;
     if (h->tid != PAT_TID)
         return;
+    if (ts->skip_changes)
+        return;
 
     ts->stream->ts_id = h->id;
 
@@ -1919,7 +1934,7 @@ static void pat_cb(MpegTSFilter *filter, const uint8_t *section, int section_len
             for (i = 0; i < ts->nb_prg; i++)
                 if (ts->prg[i].id == ts->stream->programs[j]->id)
                     break;
-            if (i==ts->nb_prg)
+            if (i==ts->nb_prg && !ts->skip_clear)
                 clear_avprogram(ts, ts->stream->programs[j]->id);
         }
     }
@@ -1941,6 +1956,8 @@ static void sdt_cb(MpegTSFilter *filter, const uint8_t *section, int section_len
     if (parse_section_header(h, &p, p_end) < 0)
         return;
     if (h->tid != SDT_TID)
+        return;
+    if (ts->skip_changes)
         return;
     onid = get16(&p, p_end);
     if (onid < 0)
