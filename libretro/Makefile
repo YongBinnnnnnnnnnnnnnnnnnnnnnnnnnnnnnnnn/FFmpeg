@@ -105,33 +105,23 @@ endif
 	HAVE_NETWORK = 1
 	HAVE_SOCKLEN = 1
 	HAVE_PTHREADS = 1
-ifeq ($(INTERNAL_LIBAVCODEC),1)
-	BAKE_IN_FFMPEG += 1
-else
+ifneq ($(INTERNAL_LIBAVCODEC),1)
    LIBS += $(shell pkg-config libavcodec --libs)
    CFLAGS += $(shell pkg-config libavcodec --cflags)
 endif
-ifeq ($(INTERNAL_LIBAVFORMAT),1)
-	BAKE_IN_FFMPEG += 1
-else
+ifneq ($(INTERNAL_LIBAVFORMAT),1)
    LIBS += $(shell pkg-config libavformat --libs)
    CFLAGS += $(shell pkg-config libavformat --cflags)
 endif
-ifeq ($(INTERNAL_LIBSWRESAMPLE),1)
-	BAKE_IN_FFMPEG += 1
-else
+ifneq ($(INTERNAL_LIBSWRESAMPLE),1)
    LIBS += $(shell pkg-config libswresample --libs)
    CFLAGS += $(shell pkg-config libswresample --cflags)
 endif
-ifeq ($(INTERNAL_LIBAVUTIL),1)
-	BAKE_IN_FFMPEG += 1
-else
+ifneq ($(INTERNAL_LIBAVUTIL),1)
    LIBS += $(shell pkg-config libavutil --libs)
    CFLAGS += $(shell pkg-config libavutil --cflags)
 endif
-ifeq ($(INTERNAL_LIBSWSCALE),1)
-	BAKE_IN_FFMPEG += 1
-else
+ifneq ($(INTERNAL_LIBSWSCALE),1)
    LIBS += $(shell pkg-config libswscale --libs)
    CFLAGS += $(shell pkg-config libswscale --cflags)
 endif
@@ -161,33 +151,23 @@ endif
 
    LIBS = $(shell pkg-config libass --libs) -pthread
    CFLAGS += $(shell pkg-config libass --cflags) -pthread
-ifeq ($(INTERNAL_LIBAVCODEC),1)
-	BAKE_IN_FFMPEG += 1
-else
+ifneq ($(INTERNAL_LIBAVCODEC),1)
    LIBS += $(shell pkg-config libavcodec --libs)
    CFLAGS += $(shell pkg-config libavcodec --cflags)
 endif
-ifeq ($(INTERNAL_LIBAVFORMAT),1)
-	BAKE_IN_FFMPEG += 1
-else
+ifneq ($(INTERNAL_LIBAVFORMAT),1)
    LIBS += $(shell pkg-config libavformat --libs)
    CFLAGS += $(shell pkg-config libavformat --cflags)
 endif
-ifeq ($(INTERNAL_LIBSWRESAMPLE),1)
-	BAKE_IN_FFMPEG += 1
-else
+ifneq ($(INTERNAL_LIBSWRESAMPLE),1)
    LIBS += $(shell pkg-config libswresample --libs)
    CFLAGS += $(shell pkg-config libswresample --cflags)
 endif
-ifeq ($(INTERNAL_LIBAVUTIL),1)
-	BAKE_IN_FFMPEG += 1
-else
+ifneq ($(INTERNAL_LIBAVUTIL),1)
    LIBS += $(shell pkg-config libavutil --libs)
    CFLAGS += $(shell pkg-config libavutil --cflags)
 endif
-ifeq ($(INTERNAL_LIBSWSCALE),1)
-	BAKE_IN_FFMPEG += 1
-else
+ifneq ($(INTERNAL_LIBSWSCALE),1)
    LIBS += $(shell pkg-config libswscale --libs)
    CFLAGS += $(shell pkg-config libswscale --cflags)
 endif
@@ -206,31 +186,41 @@ ifeq ($(OPENGL),1)
 	WIN32_PLATFORM := 1
 endif
    LIBS += -L.
-ifeq ($(INTERNAL_LIBAVCODEC),1)
-	BAKE_IN_FFMPEG += 1
-else
+ifneq ($(INTERNAL_LIBAVCODEC),1)
    LIBS += -lavcodec
 endif
-ifeq ($(INTERNAL_LIBAVFORMAT),1)
-	BAKE_IN_FFMPEG += 1
-else
+ifneq ($(INTERNAL_LIBAVFORMAT),1)
    LIBS += -lavformat
 endif
-ifeq ($(INTERNAL_LIBSWRESAMPLE),1)
-	BAKE_IN_FFMPEG += 1
-else
+ifneq ($(INTERNAL_LIBSWRESAMPLE),1)
    LIBS += -lswresample
 endif
-ifeq ($(INTERNAL_LIBAVUTIL),1)
-	BAKE_IN_FFMPEG += 1
-else
+ifneq ($(INTERNAL_LIBAVUTIL),1)
    LIBS += -lavutil
 endif
-ifeq ($(INTERNAL_LIBSWSCALE),1)
-	BAKE_IN_FFMPEG += 1
-else
+ifneq ($(INTERNAL_LIBSWSCALE),1)
 	LIBS += -lwscale
 endif
+endif
+
+ifeq ($(INTERNAL_LIBAVCODEC),1)
+	BAKE_IN_FFMPEG += 1
+endif
+
+ifeq ($(INTERNAL_LIBAVFORMAT),1)
+	BAKE_IN_FFMPEG += 1
+endif
+
+ifeq ($(INTERNAL_LIBSWRESAMPLE),1)
+	BAKE_IN_FFMPEG += 1
+endif
+
+ifeq ($(INTERNAL_LIBWSCALE),1)
+	BAKE_IN_FFMPEG += 1
+endif
+
+ifeq ($(INTERNAL_LIBAVUTIL),1)
+	BAKE_IN_FFMPEG += 1
 endif
 
 CFLAGS += -D__LIBRETRO__
