@@ -144,7 +144,7 @@ else ifneq (,$(findstring osx,$(platform)))
 ifeq ($(OPENGL),1)
    GL_LIB := -framework OpenGL
    HAVE_GL := 1
-	HAVE_GL_FFT := 1
+   HAVE_GL_FFT := 1
    CFLAGS += -DHAVE_GL
 endif
 HAVE_PTHREADS = 1
@@ -2110,7 +2110,7 @@ all: $(TARGET)
 	$(CC) -c -std=gnu99 -o $@ $< $(CFLAGS)
 
 %.o: %.cpp
-	$(CXX) -c -std=gnu++03 -fno-strict-aliasing -o $@ $< $(CFLAGS)
+	$(CXX) -c -fno-strict-aliasing -o $@ $< $(CFLAGS)
 
 $(TARGET): $(OBJECTS)
 	$(CXX) -o $@ $^ $(LIBS) $(SHARED)
