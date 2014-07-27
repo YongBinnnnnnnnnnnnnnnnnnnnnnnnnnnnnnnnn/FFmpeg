@@ -62,11 +62,6 @@ enum OutputFormat {
     FMT_MJPEG,
 };
 
-#define MPEG_BUF_SIZE (16 * 1024)
-
-#define QMAT_SHIFT_MMX 16
-#define QMAT_SHIFT 21
-
 #define MAX_FCODE 7
 #define MAX_MV 4096
 
@@ -76,8 +71,6 @@ enum OutputFormat {
 #define MAX_B_FRAMES 16
 
 #define ME_MAP_SIZE 64
-#define ME_MAP_SHIFT 3
-#define ME_MAP_MV_BITS 11
 
 #define MAX_MB_BYTES (30*16*16*3/8 + 120)
 
@@ -440,7 +433,7 @@ typedef struct MpegEncContext {
     uint16_t chroma_intra_matrix[64];
     uint16_t inter_matrix[64];
     uint16_t chroma_inter_matrix[64];
-#define QUANT_BIAS_SHIFT 8
+
     int intra_quant_bias;    ///< bias for the quantizer
     int inter_quant_bias;    ///< bias for the quantizer
     int min_qcoeff;          ///< minimum encodable coefficient
@@ -468,8 +461,6 @@ typedef struct MpegEncContext {
     int (*dct_error_sum)[64];
     int dct_count[2];
     uint16_t (*dct_offset)[64];
-
-    void *opaque;              ///< private data for the user
 
     /* bit rate control */
     int64_t total_bits;
@@ -556,7 +547,6 @@ typedef struct MpegEncContext {
     /* RV10 specific */
     int rv10_version; ///< RV10 version: 0 or 3
     int rv10_first_dc_coded[3];
-    int orig_width, orig_height;
 
     /* MJPEG specific */
     struct MJpegContext *mjpeg_ctx;
@@ -650,10 +640,6 @@ typedef struct MpegEncContext {
                            int16_t *block/*align 16*/, int n, int qscale);
     void (*dct_unquantize_h263_inter)(struct MpegEncContext *s,
                            int16_t *block/*align 16*/, int n, int qscale);
-    void (*dct_unquantize_h261_intra)(struct MpegEncContext *s,
-                           int16_t *block/*align 16*/, int n, int qscale);
-    void (*dct_unquantize_h261_inter)(struct MpegEncContext *s,
-                           int16_t *block/*align 16*/, int n, int qscale);
     void (*dct_unquantize_intra)(struct MpegEncContext *s, // unquantizer to use (mpeg4 can use both)
                            int16_t *block/*align 16*/, int n, int qscale);
     void (*dct_unquantize_inter)(struct MpegEncContext *s, // unquantizer to use (mpeg4 can use both)
@@ -743,6 +729,7 @@ void ff_dct_encode_init_x86(MpegEncContext *s);
 void ff_MPV_common_init_x86(MpegEncContext *s);
 void ff_MPV_common_init_axp(MpegEncContext *s);
 void ff_MPV_common_init_arm(MpegEncContext *s);
+void ff_MPV_common_init_neon(MpegEncContext *s);
 void ff_MPV_common_init_ppc(MpegEncContext *s);
 void ff_clean_intra_table_entries(MpegEncContext *s);
 void ff_mpeg_draw_horiz_band(MpegEncContext *s, int y, int h);

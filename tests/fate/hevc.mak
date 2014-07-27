@@ -7,6 +7,7 @@ HEVC_SAMPLES =                  \
     AMVP_A_MTK_4                \
     AMVP_B_MTK_4                \
     AMVP_C_Samsung_4            \
+    BUMPING_A_ericsson_1        \
     CAINIT_A_SHARP_4            \
     CAINIT_B_SHARP_4            \
     CAINIT_C_SHARP_3            \
@@ -18,6 +19,7 @@ HEVC_SAMPLES =                  \
     CIP_A_Panasonic_3           \
     cip_B_NEC_3                 \
     CIP_C_Panasonic_2           \
+    CONFWIN_A_Sony_1            \
     DBLK_A_SONY_3               \
     DBLK_B_SONY_3               \
     DBLK_C_SONY_3               \
@@ -143,29 +145,73 @@ HEVC_SAMPLES_10BIT =            \
     WPP_F_ericsson_MAIN10_2     \
     INITQP_B_Sony_1             \
 
+HEVC_SAMPLES_422_10BIT =        \
+    ADJUST_IPRED_ANGLE_A_RExt_Mitsubishi_1 \
+    IPCM_A_RExt_NEC             \
+
+HEVC_SAMPLES_422_10BIN =        \
+    Main_422_10_A_RExt_Sony_1   \
+    Main_422_10_B_RExt_Sony_1   \
+
+HEVC_SAMPLES_444_8BIT =         \
+    QMATRIX_A_RExt_Sony_1       \
+
+HEVC_SAMPLES_444_12BIT =        \
+    IPCM_B_RExt_NEC             \
+    PERSIST_RPARAM_A_RExt_Sony_1\
+    SAO_A_RExt_MediaTek_1       \
+
+
 # equivalent bitstreams
 # AMP_D_Hisilicon_3 -- AMP_D_Hisilicon
 # AMP_E_Hisilicon_3 -- AMP_E_Hisilicon
 # MVDL1ZERO_A_docomo_4 -- MVDL1ZERO_A_docomo_3
 # RAP_A_docomo_5 -- RAP_A_docomo_4
+# RAP_B_bossen_2 -- RAP_B_bossen_1
 # RPS_A_docomo_5 -- RPS_A_docomo_4
 # RPS_F_docomo_2 -- RPS_F_docomo_1
 
 # do not pass:
 # TSUNEQBD_A_MAIN10_Technicolor_2.bit (segfault mix 9-10bits)
+# PERSIST_RPARAM_A_RExt_Sony_1 (rext)
+
 
 define FATE_HEVC_TEST
 FATE_HEVC += fate-hevc-conformance-$(1)
-fate-hevc-conformance-$(1): CMD = framecrc -vsync drop -i $(TARGET_SAMPLES)/hevc-conformance/$(1).bit
+fate-hevc-conformance-$(1): CMD = framecrc -flags unaligned -vsync drop -i $(TARGET_SAMPLES)/hevc-conformance/$(1).bit
 endef
 
 define FATE_HEVC_TEST_10BIT
 FATE_HEVC += fate-hevc-conformance-$(1)
-fate-hevc-conformance-$(1): CMD = framecrc -vsync drop -i $(TARGET_SAMPLES)/hevc-conformance/$(1).bit -pix_fmt yuv420p10le
+fate-hevc-conformance-$(1): CMD = framecrc -flags unaligned -vsync drop -i $(TARGET_SAMPLES)/hevc-conformance/$(1).bit -pix_fmt yuv420p10le
+endef
+
+define FATE_HEVC_TEST_422_10BIT
+FATE_HEVC += fate-hevc-conformance-$(1)
+fate-hevc-conformance-$(1): CMD = framecrc -flags unaligned -vsync drop -i $(TARGET_SAMPLES)/hevc-conformance/$(1).bit -pix_fmt yuv422p10le
+endef
+
+define FATE_HEVC_TEST_422_10BIN
+FATE_HEVC += fate-hevc-conformance-$(1)
+fate-hevc-conformance-$(1): CMD = framecrc -flags unaligned -vsync drop -i $(TARGET_SAMPLES)/hevc-conformance/$(1).bin -pix_fmt yuv422p10le
+endef
+
+define FATE_HEVC_TEST_444_8BIT
+FATE_HEVC += fate-hevc-conformance-$(1)
+fate-hevc-conformance-$(1): CMD = framecrc -flags unaligned -vsync drop -i $(TARGET_SAMPLES)/hevc-conformance/$(1).bit
+endef
+
+define FATE_HEVC_TEST_444_12BIT
+FATE_HEVC += fate-hevc-conformance-$(1)
+fate-hevc-conformance-$(1): CMD = framecrc -flags unaligned -vsync drop -i $(TARGET_SAMPLES)/hevc-conformance/$(1).bit -pix_fmt yuv444p12le
 endef
 
 $(foreach N,$(HEVC_SAMPLES),$(eval $(call FATE_HEVC_TEST,$(N))))
 $(foreach N,$(HEVC_SAMPLES_10BIT),$(eval $(call FATE_HEVC_TEST_10BIT,$(N))))
+$(foreach N,$(HEVC_SAMPLES_422_10BIT),$(eval $(call FATE_HEVC_TEST_422_10BIT,$(N))))
+$(foreach N,$(HEVC_SAMPLES_422_10BIN),$(eval $(call FATE_HEVC_TEST_422_10BIN,$(N))))
+$(foreach N,$(HEVC_SAMPLES_444_8BIT),$(eval $(call FATE_HEVC_TEST_444_8BIT,$(N))))
+$(foreach N,$(HEVC_SAMPLES_444_12BIT),$(eval $(call FATE_HEVC_TEST_444_12BIT,$(N))))
 
 FATE_HEVC-$(call DEMDEC, HEVC, HEVC) += $(FATE_HEVC)
 

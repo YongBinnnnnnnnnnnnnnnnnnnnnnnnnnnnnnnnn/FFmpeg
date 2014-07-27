@@ -16,11 +16,17 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-#ifndef AVCODEC_PPC_FDCTDSP_H
-#define AVCODEC_PPC_FDCTDSP_H
+#include "config.h"
 
-#include <stdint.h>
+#include "fdct.h"
 
-void ff_fdct_altivec(int16_t *block);
+static const struct algo fdct_tab_arch[] = {
+#if HAVE_ALTIVEC
+    { "altivecfdct", ff_fdct_altivec, FF_IDCT_PERM_NONE, AV_CPU_FLAG_ALTIVEC },
+#endif
+    { 0 }
+};
 
-#endif /* AVCODEC_PPC_FDCTDSP_H */
+static const struct algo idct_tab_arch[] = {
+    { 0 }
+};

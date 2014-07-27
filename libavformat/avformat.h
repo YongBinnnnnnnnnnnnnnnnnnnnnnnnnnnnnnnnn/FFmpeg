@@ -1752,14 +1752,14 @@ int avformat_network_deinit(void);
  * if f is non-NULL, returns the next registered input format after f
  * or NULL if f is the last one.
  */
-AVInputFormat  *av_iformat_next(AVInputFormat  *f);
+AVInputFormat  *av_iformat_next(const AVInputFormat  *f);
 
 /**
  * If f is NULL, returns the first registered output format,
  * if f is non-NULL, returns the next registered output format after f
  * or NULL if f is the last one.
  */
-AVOutputFormat *av_oformat_next(AVOutputFormat *f);
+AVOutputFormat *av_oformat_next(const AVOutputFormat *f);
 
 /**
  * Allocate an AVFormatContext.
@@ -2584,7 +2584,8 @@ int av_match_ext(const char *filename, const char *extensions);
  * @return 1 if codec with ID codec_id can be stored in ofmt, 0 if it cannot.
  *         A negative number if this information is not available.
  */
-int avformat_query_codec(AVOutputFormat *ofmt, enum AVCodecID codec_id, int std_compliance);
+int avformat_query_codec(const AVOutputFormat *ofmt, enum AVCodecID codec_id,
+                         int std_compliance);
 
 /**
  * @defgroup riff_fourcc RIFF FourCCs

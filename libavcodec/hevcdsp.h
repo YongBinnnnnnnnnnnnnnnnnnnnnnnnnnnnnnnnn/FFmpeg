@@ -31,11 +31,11 @@ typedef struct SAOParams {
     int offset_abs[3][4];   ///< sao_offset_abs
     int offset_sign[3][4];  ///< sao_offset_sign
 
-    int band_position[3];   ///< sao_band_position
+    uint8_t band_position[3];   ///< sao_band_position
 
     int eo_class[3];        ///< sao_eo_class
 
-    int offset_val[3][5];   ///<SaoOffsetVal
+    int16_t offset_val[3][5];   ///<SaoOffsetVal
 
     uint8_t type_idx[3];    ///< sao_type_idx
 } SAOParams;
@@ -56,13 +56,11 @@ typedef struct HEVCDSPContext {
 
     void (*idct_dc[4])(int16_t *coeffs);
 
-    void (*transform_dc_add[4])(uint8_t *dst, int16_t *coeffs, ptrdiff_t stride);
-
-    void (*sao_band_filter)(uint8_t *_dst, uint8_t *_src, ptrdiff_t _stride,
+    void (*sao_band_filter)(uint8_t *_dst, uint8_t *_src, ptrdiff_t _stride_dst, ptrdiff_t _stride_src,
                             struct SAOParams *sao, int *borders,
                             int width, int height, int c_idx);
 
-    void (*sao_edge_filter[2])(uint8_t *_dst, uint8_t *_src, ptrdiff_t _stride,
+    void (*sao_edge_filter[2])(uint8_t *_dst, uint8_t *_src, ptrdiff_t _stride_dst, ptrdiff_t _stride_src,
                                struct SAOParams *sao, int *borders, int _width,
                                int _height, int c_idx, uint8_t *vert_edge,
                                uint8_t *horiz_edge, uint8_t *diag_edge);
@@ -97,20 +95,20 @@ typedef struct HEVCDSPContext {
                                          int ox1, intptr_t mx, intptr_t my, int width);
 
     void (*hevc_h_loop_filter_luma)(uint8_t *pix, ptrdiff_t stride,
-                                    int *beta, int *tc,
+                                    int beta, int *tc,
                                     uint8_t *no_p, uint8_t *no_q);
     void (*hevc_v_loop_filter_luma)(uint8_t *pix, ptrdiff_t stride,
-                                    int *beta, int *tc,
+                                    int beta, int *tc,
                                     uint8_t *no_p, uint8_t *no_q);
     void (*hevc_h_loop_filter_chroma)(uint8_t *pix, ptrdiff_t stride,
                                       int *tc, uint8_t *no_p, uint8_t *no_q);
     void (*hevc_v_loop_filter_chroma)(uint8_t *pix, ptrdiff_t stride,
                                       int *tc, uint8_t *no_p, uint8_t *no_q);
     void (*hevc_h_loop_filter_luma_c)(uint8_t *pix, ptrdiff_t stride,
-                                      int *beta, int *tc,
+                                      int beta, int *tc,
                                       uint8_t *no_p, uint8_t *no_q);
     void (*hevc_v_loop_filter_luma_c)(uint8_t *pix, ptrdiff_t stride,
-                                      int *beta, int *tc,
+                                      int beta, int *tc,
                                       uint8_t *no_p, uint8_t *no_q);
     void (*hevc_h_loop_filter_chroma_c)(uint8_t *pix, ptrdiff_t stride,
                                         int *tc, uint8_t *no_p,
@@ -125,6 +123,6 @@ void ff_hevc_dsp_init(HEVCDSPContext *hpc, int bit_depth);
 extern const int8_t ff_hevc_epel_filters[7][4];
 extern const int8_t ff_hevc_qpel_filters[3][16];
 
-void ff_hevcdsp_init_x86(HEVCDSPContext *c, const int bit_depth);
+void ff_hevc_dsp_init_x86(HEVCDSPContext *c, const int bit_depth);
 
 #endif /* AVCODEC_HEVCDSP_H */

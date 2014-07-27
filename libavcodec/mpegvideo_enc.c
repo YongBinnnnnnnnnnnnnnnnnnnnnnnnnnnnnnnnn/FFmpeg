@@ -59,6 +59,11 @@
 #include <limits.h>
 #include "sp5x.h"
 
+#define QUANT_BIAS_SHIFT 8
+
+#define QMAT_SHIFT_MMX 16
+#define QMAT_SHIFT 21
+
 static int encode_picture(MpegEncContext *s, int picture_number);
 static int dct_quantize_refine(MpegEncContext *s, int16_t *block, int16_t *weight, int16_t *orig, int n, int qscale);
 static int sse_mb(MpegEncContext *s);
@@ -4463,7 +4468,7 @@ int ff_dct_quantize_c(MpegEncContext *s,
     *overflow= s->max_qcoeff < max; //overflow might have happened
 
     /* we need this permutation so that we correct the IDCT, we only permute the !=0 elements */
-    if (s->idsp.idct_permutation_type != FF_NO_IDCT_PERM)
+    if (s->idsp.perm_type != FF_IDCT_PERM_NONE)
         ff_block_permute(block, s->idsp.idct_permutation,
                          scantable, last_non_zero);
 

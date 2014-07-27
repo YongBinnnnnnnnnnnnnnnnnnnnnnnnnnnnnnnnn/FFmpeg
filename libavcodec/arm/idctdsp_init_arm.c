@@ -26,10 +26,8 @@
 #include "libavutil/arm/cpu.h"
 #include "libavcodec/avcodec.h"
 #include "libavcodec/idctdsp.h"
+#include "idct.h"
 #include "idctdsp_arm.h"
-
-void ff_j_rev_dct_arm(int16_t *data);
-void ff_simple_idct_arm(int16_t *data);
 
 /* XXX: local hack */
 static void (*ff_put_pixels_clamped)(const int16_t *block, uint8_t *pixels, int line_size);
@@ -75,15 +73,15 @@ av_cold void ff_idctdsp_init_arm(IDCTDSPContext *c, AVCodecContext *avctx,
     if (!avctx->lowres && !high_bit_depth) {
         if (avctx->idct_algo == FF_IDCT_AUTO ||
             avctx->idct_algo == FF_IDCT_ARM) {
-            c->idct_put              = j_rev_dct_arm_put;
-            c->idct_add              = j_rev_dct_arm_add;
-            c->idct                  = ff_j_rev_dct_arm;
-            c->idct_permutation_type = FF_LIBMPEG2_IDCT_PERM;
+            c->idct_put  = j_rev_dct_arm_put;
+            c->idct_add  = j_rev_dct_arm_add;
+            c->idct      = ff_j_rev_dct_arm;
+            c->perm_type = FF_IDCT_PERM_LIBMPEG2;
         } else if (avctx->idct_algo == FF_IDCT_SIMPLEARM) {
-            c->idct_put              = simple_idct_arm_put;
-            c->idct_add              = simple_idct_arm_add;
-            c->idct                  = ff_simple_idct_arm;
-            c->idct_permutation_type = FF_NO_IDCT_PERM;
+            c->idct_put  = simple_idct_arm_put;
+            c->idct_add  = simple_idct_arm_add;
+            c->idct      = ff_simple_idct_arm;
+            c->perm_type = FF_IDCT_PERM_NONE;
         }
     }
 
