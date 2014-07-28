@@ -15,6 +15,7 @@ HEADERS = avcodec.h                                                     \
 
 OBJS = allcodecs.o                                                      \
        audioconvert.o                                                   \
+       avdct.o                                                          \
        avpacket.o                                                       \
        avpicture.o                                                      \
        bitstream.o                                                      \
@@ -318,8 +319,7 @@ OBJS-$(CONFIG_MP3ON4_DECODER)          += mpegaudiodec_fixed.o mpeg4audio.o
 OBJS-$(CONFIG_MP3ON4FLOAT_DECODER)     += mpegaudiodec_float.o mpeg4audio.o
 OBJS-$(CONFIG_MPC7_DECODER)            += mpc7.o mpc.o
 OBJS-$(CONFIG_MPC8_DECODER)            += mpc8.o mpc.o
-OBJS-$(CONFIG_MPEGVIDEO_DECODER)       += mpeg12.o mpeg12data.o \
-                                          mpegvideo.o error_resilience.o
+OBJS-$(CONFIG_MPEGVIDEO_DECODER)       += mpeg12dec.o mpeg12.o mpeg12data.o
 OBJS-$(CONFIG_MPEG1VIDEO_DECODER)      += mpeg12dec.o mpeg12.o mpeg12data.o
 OBJS-$(CONFIG_MPEG1VIDEO_ENCODER)      += mpeg12enc.o mpeg12.o
 OBJS-$(CONFIG_MPEG2VIDEO_DECODER)      += mpeg12dec.o mpeg12.o mpeg12data.o
@@ -705,6 +705,7 @@ OBJS-$(CONFIG_TAK_DEMUXER)             += tak.o
 OBJS-$(CONFIG_WEBM_MUXER)              += mpeg4audio.o mpegaudiodata.o  \
                                           xiph.o flac.o flacdata.o \
                                           vorbis_data.o
+OBJS-$(CONFIG_WEBM_DASH_MANIFEST_DEMUXER) += vorbis_parser.o xiph.o
 OBJS-$(CONFIG_WTV_DEMUXER)             += mpeg4audio.o mpegaudiodata.o
 
 # libavfilter dependencies

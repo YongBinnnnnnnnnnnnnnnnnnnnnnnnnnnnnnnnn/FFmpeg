@@ -2132,6 +2132,7 @@ mpc7_decoder_select="bswapdsp mpegaudiodsp"
 mpc8_decoder_select="mpegaudiodsp"
 mpeg_xvmc_decoder_deps="X11_extensions_XvMClib_h"
 mpeg_xvmc_decoder_select="mpeg2video_decoder"
+mpegvideo_decoder_select="error_resilience mpeg_er mpegvideo"
 mpeg1video_decoder_select="error_resilience mpeg_er mpegvideo"
 mpeg1video_encoder_select="aandcttables mpegvideoenc h263dsp"
 mpeg2video_decoder_select="error_resilience mpeg_er mpegvideo"
@@ -5191,7 +5192,7 @@ enabled_all dxva2 dxva2api_cobj CoTaskMemFree &&
     enable dxva2_lib
 
 ! enabled_any memalign posix_memalign aligned_malloc &&
-    enabled $simd_align_16 && enable memalign_hack
+    enabled simd_align_16 && enable memalign_hack
 
 # add_dep lib dep
 # -> enable ${lib}_deps_${dep}

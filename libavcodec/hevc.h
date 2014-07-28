@@ -82,8 +82,6 @@
  */
 #define SAMPLE(tab, x, y) ((tab)[(y) * s->sps->width + (x)])
 #define SAMPLE_CTB(tab, x, y) ((tab)[(y) * min_cb_width + (x)])
-#define SAMPLE_CBF(tab, x, y) ((tab)[((y) & ((1<<log2_trafo_size)-1)) * MAX_CU_SIZE + ((x) & ((1<<log2_trafo_size)-1))])
-#define SAMPLE_CBF2(tab, x, y) ((tab)[(y) * MAX_CU_SIZE +  (x)])
 
 #define IS_IDR(s) ((s)->nal_unit_type == NAL_IDR_W_RADL || (s)->nal_unit_type == NAL_IDR_N_LP)
 #define IS_BLA(s) ((s)->nal_unit_type == NAL_BLA_W_RADL || (s)->nal_unit_type == NAL_BLA_W_LP || \
@@ -686,8 +684,6 @@ typedef struct PredictionUnit {
 } PredictionUnit;
 
 typedef struct TransformTree {
-    uint8_t cbf_cb[MAX_TRANSFORM_DEPTH][MAX_CU_SIZE * MAX_CU_SIZE];
-    uint8_t cbf_cr[MAX_TRANSFORM_DEPTH][MAX_CU_SIZE * MAX_CU_SIZE];
     uint8_t cbf_luma;
 
     // Inferred parameters
@@ -1030,7 +1026,7 @@ void ff_hevc_luma_mv_mvp_mode(HEVCContext *s, int x0, int y0,
                               int nPbW, int nPbH, int log2_cb_size,
                               int part_idx, int merge_idx,
                               MvField *mv, int mvp_lx_flag, int LX);
-void ff_hevc_set_qPy(HEVCContext *s, int xC, int yC, int xBase, int yBase,
+void ff_hevc_set_qPy(HEVCContext *s, int xBase, int yBase,
                      int log2_cb_size);
 void ff_hevc_deblocking_boundary_strengths(HEVCContext *s, int x0, int y0,
                                            int log2_trafo_size);
