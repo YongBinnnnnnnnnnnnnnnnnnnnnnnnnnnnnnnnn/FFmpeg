@@ -419,7 +419,7 @@ int ff_img_read_packet(AVFormatContext *s1, AVPacket *pkt)
             infer_size(&codec->width, &codec->height, size[0]);
     } else {
         f[0] = s1->pb;
-        if (url_feof(f[0]))
+        if (avio_feof(f[0]))
             return AVERROR(EIO);
         if (s->frame_size > 0) {
             size[0] = s->frame_size;
@@ -658,6 +658,16 @@ static int tiff_probe(AVProbeData *p)
     return 0;
 }
 
+static int webp_probe(AVProbeData *p)
+{
+    const uint8_t *b = p->buf;
+
+    if (AV_RB32(b)     == 0x52494646 &&
+        AV_RB32(b + 8) == 0x57454250)
+        return AVPROBE_SCORE_MAX - 1;
+    return 0;
+}
+
 #define IMAGEAUTO_DEMUXER(imgname, codecid)\
 static const AVClass imgname ## _class = {\
     .class_name = AV_STRINGIFY(imgname) " demuxer",\
@@ -685,3 +695,4 @@ IMAGEAUTO_DEMUXER(png,     AV_CODEC_ID_PNG)
 IMAGEAUTO_DEMUXER(sgi,     AV_CODEC_ID_SGI)
 IMAGEAUTO_DEMUXER(sunrast, AV_CODEC_ID_SUNRAST)
 IMAGEAUTO_DEMUXER(tiff,    AV_CODEC_ID_TIFF)
+IMAGEAUTO_DEMUXER(webp,    AV_CODEC_ID_WEBP)

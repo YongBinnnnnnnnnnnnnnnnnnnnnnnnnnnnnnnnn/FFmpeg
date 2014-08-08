@@ -330,6 +330,7 @@ void av_register_all(void)
     REGISTER_DEMUXER (IMAGE_SGI_PIPE,        image_sgi_pipe);
     REGISTER_DEMUXER (IMAGE_SUNRAST_PIPE,    image_sunrast_pipe);
     REGISTER_DEMUXER (IMAGE_TIFF_PIPE,       image_tiff_pipe);
+    REGISTER_DEMUXER (IMAGE_WEBP_PIPE,       image_webp_pipe);
 
 
     /* protocols */
@@ -347,6 +348,7 @@ void av_register_all(void)
     REGISTER_PROTOCOL(HTTP,             http);
     REGISTER_PROTOCOL(HTTPPROXY,        httpproxy);
     REGISTER_PROTOCOL(HTTPS,            https);
+    REGISTER_PROTOCOL(ICECAST,          icecast);
     REGISTER_PROTOCOL(MMSH,             mmsh);
     REGISTER_PROTOCOL(MMST,             mmst);
     REGISTER_PROTOCOL(MD5,              md5);
