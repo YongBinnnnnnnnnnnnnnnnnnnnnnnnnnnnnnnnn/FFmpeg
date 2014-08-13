@@ -48,6 +48,11 @@ void ff_init_scantable_permutation(uint8_t *idct_permutation,
 int ff_init_scantable_permutation_x86(uint8_t *idct_permutation,
                                       enum idct_permutation_type perm_type);
 
+void ff_put_pixels_clamped(const int16_t *block, uint8_t *av_restrict pixels,
+                           int line_size);
+void ff_add_pixels_clamped(const int16_t *block, uint8_t *av_restrict pixels,
+                           int line_size);
+
 typedef struct IDCTDSPContext {
     /* pixel ops : interface with DCT */
     void (*put_pixels_clamped)(const int16_t *block /* align 16 */,
