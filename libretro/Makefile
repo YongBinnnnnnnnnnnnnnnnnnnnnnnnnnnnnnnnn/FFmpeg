@@ -186,7 +186,7 @@ ifneq ($(INTERNAL_LIBAVUTIL),1)
    LIBS += -lavutil
 endif
 ifneq ($(INTERNAL_LIBSWSCALE),1)
-	LIBS += -lwscale
+	LIBS += -lswscale
 endif
 endif
 
