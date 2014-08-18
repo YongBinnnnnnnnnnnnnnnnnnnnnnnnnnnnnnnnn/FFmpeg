@@ -191,7 +191,8 @@ static int decode_frame(AVCodecContext *avctx, void *data, int *got_frame, AVPac
     case AV_CODEC_ID_MSZH:
         switch (c->compression) {
         case COMP_MSZH:
-            if (c->imgtype == IMGTYPE_RGB24 && len == width * height * 3) {
+            if (c->imgtype == IMGTYPE_RGB24 && len == width * height * 3 ||
+                c->imgtype == IMGTYPE_YUV111 && len == width * height * 3) {
                 ;
             } else if (c->flags & FLAG_MULTITHREAD) {
                 mthread_inlen = AV_RL32(buf);
@@ -593,7 +594,7 @@ static av_cold int decode_init(AVCodecContext *avctx)
 
     /* Allocate decompression buffer */
     if (c->decomp_size) {
-        if ((c->decomp_buf = av_malloc(max_decomp_size)) == NULL) {
+        if (!(c->decomp_buf = av_malloc(max_decomp_size))) {
             av_log(avctx, AV_LOG_ERROR, "Can't allocate decompression buffer.\n");
             return AVERROR(ENOMEM);
         }

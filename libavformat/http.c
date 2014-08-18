@@ -157,7 +157,7 @@ static int http_open_cnx_internal(URLContext *h, AVDictionary **options)
 
     proxy_path = getenv("http_proxy");
     use_proxy  = !ff_http_match_no_proxy(getenv("no_proxy"), hostname) &&
-                 proxy_path != NULL && av_strstart(proxy_path, "http://", NULL);
+                 proxy_path && av_strstart(proxy_path, "http://", NULL);
 
     if (!strcmp(proto, "https")) {
         lower_proto = "tls";
@@ -390,11 +390,11 @@ static void parse_content_range(URLContext *h, const char *p)
 
 static int parse_content_encoding(URLContext *h, const char *p)
 {
-    HTTPContext *s = h->priv_data;
-
     if (!av_strncasecmp(p, "gzip", 4) ||
         !av_strncasecmp(p, "deflate", 7)) {
 #if CONFIG_ZLIB
+        HTTPContext *s = h->priv_data;
+
         s->compressed = 1;
         inflateEnd(&s->inflate_stream);
         if (inflateInit2(&s->inflate_stream, 32 + 15) != Z_OK) {
@@ -565,8 +565,11 @@ static int get_cookies(HTTPContext *s, char **cookies, const char *path,
         set_cookies = NULL;
 
         while ((param = av_strtok(cookie, "; ", &next_param))) {
-            cookie = NULL;
-            if        (!av_strncasecmp("path=",   param, 5)) {
+            if (cookie) {
+                // first key-value pair is the actual cookie value
+                cvalue = av_strdup(param);
+                cookie = NULL;
+            } else if (!av_strncasecmp("path=",   param, 5)) {
                 av_free(cpath);
                 cpath = av_strdup(&param[5]);
             } else if (!av_strncasecmp("domain=", param, 7)) {
@@ -575,14 +578,8 @@ static int get_cookies(HTTPContext *s, char **cookies, const char *path,
                 int leading_dot = (param[7] == '.');
                 av_free(cdomain);
                 cdomain = av_strdup(&param[7+leading_dot]);
-            } else if (!av_strncasecmp("secure",  param, 6) ||
-                       !av_strncasecmp("comment", param, 7) ||
-                       !av_strncasecmp("max-age", param, 7) ||
-                       !av_strncasecmp("version", param, 7)) {
-                // ignore Comment, Max-Age, Secure and Version
             } else {
-                av_free(cvalue);
-                cvalue = av_strdup(param);
+                // ignore unknown attributes
             }
         }
         if (!cdomain)
