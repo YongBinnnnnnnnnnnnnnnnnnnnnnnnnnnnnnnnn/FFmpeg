@@ -10813,6 +10813,9 @@ Draw a vertical line for each sample.
 
 @item p2p
 Draw a point for each sample and a line between them.
+
+@item cline
+Draw a centered vertical line for each sample.
 @end table
 
 Default value is @code{point}.
@@ -10826,6 +10829,9 @@ is not explicitly specified.
 @item rate, r
 Set the (approximate) output frame rate. This is done by setting the
 option @var{n}. Default value is "25".
+
+@item split_channels
+Set if channels should be drawn separately or overlap. Default value is 0.
 
 @end table
 
