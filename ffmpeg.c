@@ -590,6 +590,14 @@ static void write_frame(AVFormatContext *s, AVPacket *pkt, OutputStream *ost)
     AVCodecContext          *avctx = ost->st->codec;
     int ret;
 
+    if (!ost->st->codec->extradata_size && ost->enc_ctx->extradata_size) {
+        ost->st->codec->extradata = av_mallocz(ost->enc_ctx->extradata_size + FF_INPUT_BUFFER_PADDING_SIZE);
+        if (ost->st->codec->extradata) {
+            memcpy(ost->st->codec->extradata, ost->enc_ctx->extradata, ost->enc_ctx->extradata_size);
+            ost->st->codec->extradata_size = ost->enc_ctx->extradata_size;
+        }
+    }
+
     if ((avctx->codec_type == AVMEDIA_TYPE_VIDEO && video_sync_method == VSYNC_DROP) ||
         (avctx->codec_type == AVMEDIA_TYPE_AUDIO && audio_sync_method < 0))
         pkt->pts = pkt->dts = AV_NOPTS_VALUE;
@@ -2297,8 +2305,12 @@ static int init_input_stream(int ist_index, char *error, int error_len)
         ist->dec_ctx->thread_safe_callbacks = 1;
 
         av_opt_set_int(ist->dec_ctx, "refcounted_frames", 1, 0);
-        if(ist->dec_ctx->codec_id == AV_CODEC_ID_DVB_SUBTITLE)
-            av_dict_set(&ist->decoder_opts, "compute_edt", "1", 0);
+        if (ist->dec_ctx->codec_id == AV_CODEC_ID_DVB_SUBTITLE &&
+           (ist->decoding_needed & DECODING_FOR_OST)) {
+            av_dict_set(&ist->decoder_opts, "compute_edt", "1", AV_DICT_DONT_OVERWRITE);
+            if (ist->decoding_needed & DECODING_FOR_FILTER)
+                av_log(NULL, AV_LOG_WARNING, "Warning using DVB subtitles for filtering and output at the same time is not fully supported, also see -compute_edt [0|1]\n");
+        }
 
         if (!av_dict_get(ist->decoder_opts, "threads", NULL, 0))
             av_dict_set(&ist->decoder_opts, "threads", "auto", 0);
@@ -2678,7 +2690,7 @@ static int transcode_init(void)
             }
 
             if (ist)
-                ist->decoding_needed++;
+                ist->decoding_needed |= DECODING_FOR_OST;
             ost->encoding_needed = 1;
 
             set_encoder_id(output_files[ost->file_index], ost);
@@ -3433,7 +3445,7 @@ static int process_input(int file_index)
     }
 
     /* add the stream-global side data to the first packet */
-    if (ist->nb_packets == 1)
+    if (ist->nb_packets == 1) {
         if (ist->st->nb_side_data)
             av_packet_split_side_data(&pkt);
         for (i = 0; i < ist->st->nb_side_data; i++) {
@@ -3449,6 +3461,7 @@ static int process_input(int file_index)
 
             memcpy(dst_data, src_sd->data, src_sd->size);
         }
+    }
 
     if (pkt.dts != AV_NOPTS_VALUE)
         pkt.dts += av_rescale_q(ifile->ts_offset, AV_TIME_BASE_Q, ist->st->time_base);

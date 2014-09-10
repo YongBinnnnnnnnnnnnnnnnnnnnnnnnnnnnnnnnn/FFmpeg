@@ -340,7 +340,6 @@ static EbmlSyntax matroska_track_video[] = {
     { MATROSKA_ID_VIDEOPIXELWIDTH,     EBML_UINT,  0, offsetof(MatroskaTrackVideo, pixel_width) },
     { MATROSKA_ID_VIDEOPIXELHEIGHT,    EBML_UINT,  0, offsetof(MatroskaTrackVideo, pixel_height) },
     { MATROSKA_ID_VIDEOCOLORSPACE,     EBML_BIN,   0, offsetof(MatroskaTrackVideo, color_space) },
-    { MATROSKA_ID_VIDEOSTEREOMODE,     EBML_UINT,  0, offsetof(MatroskaTrackVideo, stereo_mode) },
     { MATROSKA_ID_VIDEOALPHAMODE,      EBML_UINT,  0, offsetof(MatroskaTrackVideo, alpha_mode) },
     { MATROSKA_ID_VIDEOPIXELCROPB,     EBML_NONE },
     { MATROSKA_ID_VIDEOPIXELCROPT,     EBML_NONE },
@@ -348,6 +347,7 @@ static EbmlSyntax matroska_track_video[] = {
     { MATROSKA_ID_VIDEOPIXELCROPR,     EBML_NONE },
     { MATROSKA_ID_VIDEODISPLAYUNIT,    EBML_NONE },
     { MATROSKA_ID_VIDEOFLAGINTERLACED, EBML_NONE },
+    { MATROSKA_ID_VIDEOSTEREOMODE,     EBML_UINT,  0, offsetof(MatroskaTrackVideo, stereo_mode), { .u = MATROSKA_VIDEO_STEREOMODE_TYPE_NB } },
     { MATROSKA_ID_VIDEOASPECTRATIO,    EBML_NONE },
     { 0 }
 };
@@ -1286,65 +1286,6 @@ failed:
     return result;
 }
 
-#if FF_API_ASS_SSA
-static void matroska_fix_ass_packet(MatroskaDemuxContext *matroska,
-                                    AVPacket *pkt, uint64_t display_duration)
-{
-    AVBufferRef *line;
-    char *layer, *ptr = pkt->data, *end = ptr + pkt->size;
-
-    for (; *ptr != ',' && ptr < end - 1; ptr++)
-        ;
-    if (*ptr == ',')
-        ptr++;
-    layer = ptr;
-    for (; *ptr != ',' && ptr < end - 1; ptr++)
-        ;
-    if (*ptr == ',') {
-        int64_t end_pts = pkt->pts + display_duration;
-        int sc = matroska->time_scale * pkt->pts / 10000000;
-        int ec = matroska->time_scale * end_pts  / 10000000;
-        int sh, sm, ss, eh, em, es, len;
-        sh     = sc / 360000;
-        sc    -= 360000 * sh;
-        sm     = sc / 6000;
-        sc    -= 6000 * sm;
-        ss     = sc / 100;
-        sc    -= 100 * ss;
-        eh     = ec / 360000;
-        ec    -= 360000 * eh;
-        em     = ec / 6000;
-        ec    -= 6000 * em;
-        es     = ec / 100;
-        ec    -= 100 * es;
-        *ptr++ = '\0';
-        len    = 50 + end - ptr + FF_INPUT_BUFFER_PADDING_SIZE;
-        if (!(line = av_buffer_alloc(len)))
-            return;
-        snprintf(line->data, len,
-                 "Dialogue: %s,%d:%02d:%02d.%02d,%d:%02d:%02d.%02d,%s\r\n",
-                 layer, sh, sm, ss, sc, eh, em, es, ec, ptr);
-        av_buffer_unref(&pkt->buf);
-        pkt->buf  = line;
-        pkt->data = line->data;
-        pkt->size = strlen(line->data);
-    }
-}
-
-static int matroska_merge_packets(AVPacket *out, AVPacket *in)
-{
-    int ret = av_grow_packet(out, in->size);
-    if (ret < 0)
-        return ret;
-
-    memcpy(out->data + out->size - in->size, in->data, in->size);
-
-    av_free_packet(in);
-    av_free(in);
-    return 0;
-}
-#endif
-
 static void matroska_convert_tag(AVFormatContext *s, EbmlList *list,
                                  AVDictionary **metadata, char *prefix)
 {
@@ -1985,7 +1926,7 @@ static int matroska_parse_tracks(AVFormatContext *s)
             }
 
             /* export stereo mode flag as metadata tag */
-            if (track->video.stereo_mode && track->video.stereo_mode < MATROSKA_VIDEO_STEREO_MODE_COUNT)
+            if (track->video.stereo_mode && track->video.stereo_mode < MATROSKA_VIDEO_STEREOMODE_TYPE_NB)
                 av_dict_set(&st->metadata, "stereo_mode", ff_matroska_video_stereo_mode[track->video.stereo_mode], 0);
 
             /* export alpha mode flag as metadata tag  */
@@ -2005,6 +1946,13 @@ static int matroska_parse_tracks(AVFormatContext *s)
                                     "stereo_mode", buf, 0);
                         break;
                     }
+            }
+            // add stream level stereo3d side data if it is a supported format
+            if (track->video.stereo_mode < MATROSKA_VIDEO_STEREOMODE_TYPE_NB &&
+                track->video.stereo_mode != 10 && track->video.stereo_mode != 12) {
+                int ret = ff_mkv_stereo3d_conv(st, track->video.stereo_mode);
+                if (ret < 0)
+                    return ret;
             }
         } else if (track->type == MATROSKA_TRACK_TYPE_AUDIO) {
             st->codec->codec_type  = AVMEDIA_TYPE_AUDIO;
@@ -2037,12 +1985,7 @@ static int matroska_parse_tracks(AVFormatContext *s)
             }
         } else if (track->type == MATROSKA_TRACK_TYPE_SUBTITLE) {
             st->codec->codec_type = AVMEDIA_TYPE_SUBTITLE;
-#if FF_API_ASS_SSA
-            if (st->codec->codec_id == AV_CODEC_ID_SSA ||
-                st->codec->codec_id == AV_CODEC_ID_ASS)
-#else
             if (st->codec->codec_id == AV_CODEC_ID_ASS)
-#endif
                 matroska->contains_ssa = 1;
         }
     }
@@ -2712,24 +2655,8 @@ static int matroska_parse_frame(MatroskaDemuxContext *matroska,
         pkt->duration = lace_duration;
     }
 
-#if FF_API_ASS_SSA
-    if (st->codec->codec_id == AV_CODEC_ID_SSA)
-        matroska_fix_ass_packet(matroska, pkt, lace_duration);
-
-    if (matroska->prev_pkt                                 &&
-        timecode                         != AV_NOPTS_VALUE &&
-        matroska->prev_pkt->pts          == timecode       &&
-        matroska->prev_pkt->stream_index == st->index      &&
-        st->codec->codec_id == AV_CODEC_ID_SSA)
-        matroska_merge_packets(matroska->prev_pkt, pkt);
-    else {
-        dynarray_add(&matroska->packets, &matroska->num_packets, pkt);
-        matroska->prev_pkt = pkt;
-    }
-#else
     dynarray_add(&matroska->packets, &matroska->num_packets, pkt);
     matroska->prev_pkt = pkt;
-#endif
 
     return 0;
 
@@ -3321,7 +3248,7 @@ static int webm_dash_manifest_cues(AVFormatContext *s)
     EbmlList *seekhead_list = &matroska->seekhead;
     MatroskaSeekhead *seekhead = seekhead_list->elem;
     char *buf;
-    int64_t cues_start, cues_end, before_pos, bandwidth;
+    int64_t cues_start = -1, cues_end = -1, before_pos, bandwidth;
     int i;
 
     // determine cues start and end positions
@@ -3340,6 +3267,7 @@ static int webm_dash_manifest_cues(AVFormatContext *s)
         cues_end = cues_start + cues_length + 11; // 11 is the offset of Cues ID.
     }
     avio_seek(matroska->ctx->pb, before_pos, SEEK_SET);
+    if (cues_start == -1 || cues_end == -1) return -1;
 
     // parse the cues
     matroska_parse_cues(matroska);
@@ -3417,6 +3345,7 @@ static int webm_dash_manifest_read_packet(AVFormatContext *s, AVPacket *pkt)
 AVInputFormat ff_matroska_demuxer = {
     .name           = "matroska,webm",
     .long_name      = NULL_IF_CONFIG_SMALL("Matroska / WebM"),
+    .extensions     = "mkv,mk3d,mka,mks",
     .priv_data_size = sizeof(MatroskaDemuxContext),
     .read_probe     = matroska_probe,
     .read_header    = matroska_read_header,

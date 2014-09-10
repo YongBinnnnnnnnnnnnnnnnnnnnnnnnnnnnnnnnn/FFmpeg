@@ -1490,14 +1490,9 @@ av_cold int ff_rv34_decode_init(AVCodecContext *avctx)
     int ret;
 
     ff_mpv_decode_defaults(s);
-    s->avctx      = avctx;
+    ff_mpv_decode_init(s, avctx);
     s->out_format = FMT_H263;
-    s->codec_id   = avctx->codec_id;
 
-    s->width  = avctx->width;
-    s->height = avctx->height;
-
-    r->s.avctx = avctx;
     avctx->pix_fmt = AV_PIX_FMT_YUV420P;
     avctx->has_b_frames = 1;
     s->low_delay = 0;
@@ -1569,16 +1564,18 @@ int ff_rv34_decode_update_thread_context(AVCodecContext *dst, const AVCodecConte
             return err;
     }
 
-    if ((err = ff_mpeg_update_thread_context(dst, src)))
-        return err;
-
     r->cur_pts  = r1->cur_pts;
     r->last_pts = r1->last_pts;
     r->next_pts = r1->next_pts;
 
     memset(&r->si, 0, sizeof(r->si));
 
-    return 0;
+    // Do no call ff_mpeg_update_thread_context on a partially initialized
+    // decoder context.
+    if (!s1->linesize)
+        return 0;
+
+    return ff_mpeg_update_thread_context(dst, src);
 }
 
 static int get_slice_offset(AVCodecContext *avctx, const uint8_t *buf, int n)

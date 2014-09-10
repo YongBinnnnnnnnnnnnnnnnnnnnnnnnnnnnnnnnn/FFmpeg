@@ -140,6 +140,8 @@ struct MpegTSContext {
     int skip_changes;
     int skip_clear;
 
+    int resync_size;
+
     /******************************************/
     /* private mpegts data */
     /* scan context */
@@ -153,25 +155,11 @@ struct MpegTSContext {
     int current_pid;
 };
 
-static const AVOption mpegtsraw_options[] = {
-    { "compute_pcr",   "Compute exact PCR for each transport stream packet.",
-          offsetof(MpegTSContext, mpeg2ts_compute_pcr), AV_OPT_TYPE_INT,
-          { .i64 = 0 }, 0, 1,  AV_OPT_FLAG_DECODING_PARAM },
-    { "ts_packetsize", "Output option carrying the raw packet size.",
-      offsetof(MpegTSContext, raw_packet_size), AV_OPT_TYPE_INT,
-      { .i64 = 0 }, 0, 0,
-      AV_OPT_FLAG_DECODING_PARAM | AV_OPT_FLAG_EXPORT | AV_OPT_FLAG_READONLY },
-    { NULL },
-};
+#define MPEGTS_OPTIONS \
+    { "resync_size",   "Size limit for looking up a new synchronization.", offsetof(MpegTSContext, resync_size), AV_OPT_TYPE_INT,  { .i64 =  MAX_RESYNC_SIZE}, 0, INT_MAX,  AV_OPT_FLAG_DECODING_PARAM }
 
-static const AVClass mpegtsraw_class = {
-    .class_name = "mpegtsraw demuxer",
-    .item_name  = av_default_item_name,
-    .option     = mpegtsraw_options,
-    .version    = LIBAVUTIL_VERSION_INT,
-};
-
-static const AVOption mpegts_options[] = {
+static const AVOption options[] = {
+    MPEGTS_OPTIONS,
     {"fix_teletext_pts", "Try to fix pts values of dvb teletext streams.", offsetof(MpegTSContext, fix_teletext_pts), AV_OPT_TYPE_INT,
      {.i64 = 1}, 0, 1, AV_OPT_FLAG_DECODING_PARAM },
     {"ts_packetsize", "Output option carrying the raw packet size.", offsetof(MpegTSContext, raw_packet_size), AV_OPT_TYPE_INT,
@@ -186,7 +174,26 @@ static const AVOption mpegts_options[] = {
 static const AVClass mpegts_class = {
     .class_name = "mpegts demuxer",
     .item_name  = av_default_item_name,
-    .option     = mpegts_options,
+    .option     = options,
+    .version    = LIBAVUTIL_VERSION_INT,
+};
+
+static const AVOption raw_options[] = {
+    MPEGTS_OPTIONS,
+    { "compute_pcr",   "Compute exact PCR for each transport stream packet.",
+          offsetof(MpegTSContext, mpeg2ts_compute_pcr), AV_OPT_TYPE_INT,
+          { .i64 = 0 }, 0, 1,  AV_OPT_FLAG_DECODING_PARAM },
+    { "ts_packetsize", "Output option carrying the raw packet size.",
+      offsetof(MpegTSContext, raw_packet_size), AV_OPT_TYPE_INT,
+      { .i64 = 0 }, 0, 0,
+      AV_OPT_FLAG_DECODING_PARAM | AV_OPT_FLAG_EXPORT | AV_OPT_FLAG_READONLY },
+    { NULL },
+};
+
+static const AVClass mpegtsraw_class = {
+    .class_name = "mpegtsraw demuxer",
+    .item_name  = av_default_item_name,
+    .option     = raw_options,
     .version    = LIBAVUTIL_VERSION_INT,
 };
 
@@ -1511,7 +1518,7 @@ int ff_parse_mpeg2_descriptor(AVFormatContext *fc, AVStream *st, int stream_type
 
     av_dlog(fc, "tag: 0x%02x len=%d\n", desc_tag, desc_len);
 
-    if (st->codec->codec_id == AV_CODEC_ID_NONE &&
+    if ((st->codec->codec_id == AV_CODEC_ID_NONE || st->request_probe > 0) &&
         stream_type == STREAM_TYPE_PRIVATE_DATA)
         mpegts_find_stream_type(st, desc_tag, DESC_types);
 
@@ -2188,10 +2195,11 @@ static void reanalyze(MpegTSContext *ts) {
  * get_packet_size() ?) */
 static int mpegts_resync(AVFormatContext *s)
 {
+    MpegTSContext *ts = s->priv_data;
     AVIOContext *pb = s->pb;
     int c, i;
 
-    for (i = 0; i < MAX_RESYNC_SIZE; i++) {
+    for (i = 0; i < ts->resync_size; i++) {
         c = avio_r8(pb);
         if (avio_feof(pb))
             return AVERROR_EOF;

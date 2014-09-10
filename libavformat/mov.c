@@ -1635,7 +1635,7 @@ static int mov_finalize_stsd_codec(MOVContext *c, AVIOContext *pb,
 
 static int mov_skip_multiple_stsd(MOVContext *c, AVIOContext *pb,
                                   int codec_tag, int format,
-                                  int size)
+                                  int64_t size)
 {
     int video_codec_id = ff_codec_get_id(ff_codec_movvideo_tags, format);
 
@@ -3562,7 +3562,7 @@ static int mov_read_header(AVFormatContext *s)
     if (mov->moov_retry)
         avio_seek(pb, 0, SEEK_SET);
     if ((err = mov_read_default(mov, pb, atom)) < 0) {
-        av_log(s, AV_LOG_ERROR, "error reading header: %d\n", err);
+        av_log(s, AV_LOG_ERROR, "error reading header\n");
         mov_read_close(s);
         return err;
     }

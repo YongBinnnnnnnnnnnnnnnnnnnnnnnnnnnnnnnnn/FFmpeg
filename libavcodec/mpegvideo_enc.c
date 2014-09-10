@@ -90,8 +90,10 @@ void ff_convert_matrix(MpegEncContext *s, int (*qmat)[64],
     for (qscale = qmin; qscale <= qmax; qscale++) {
         int i;
         if (fdsp->fdct == ff_jpeg_fdct_islow_8  ||
-            fdsp->fdct == ff_jpeg_fdct_islow_10 ||
-            fdsp->fdct == ff_faandct) {
+#if CONFIG_FAANDCT
+            fdsp->fdct == ff_faandct            ||
+#endif /* CONFIG_FAANDCT */
+            fdsp->fdct == ff_jpeg_fdct_islow_10) {
             for (i = 0; i < 64; i++) {
                 const int j = s->idsp.idct_permutation[i];
                 /* 16 <= qscale * quant_matrix[i] <= 7905
@@ -2800,6 +2802,9 @@ static int encode_thread(AVCodecContext *c, void *arg){
                 if(s->start_mb_y == mb_y && mb_y > 0 && mb_x==0) is_gob_start=1;
 
                 switch(s->codec_id){
+                case AV_CODEC_ID_H261:
+                    is_gob_start=0;//FIXME
+                    break;
                 case AV_CODEC_ID_H263:
                 case AV_CODEC_ID_H263P:
                     if(!s->h263_slice_structured)

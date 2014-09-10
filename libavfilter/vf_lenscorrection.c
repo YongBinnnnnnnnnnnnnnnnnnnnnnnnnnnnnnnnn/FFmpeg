@@ -98,7 +98,7 @@ static int filter_slice(AVFilterContext *ctx, void *arg, int job, int nb_jobs)
 
 static int query_formats(AVFilterContext *ctx)
 {
-    static enum AVPixelFormat pix_fmts[] = {
+    static const enum AVPixelFormat pix_fmts[] = {
         AV_PIX_FMT_YUV410P,
         AV_PIX_FMT_YUV444P,  AV_PIX_FMT_YUVJ444P,
         AV_PIX_FMT_YUV420P,  AV_PIX_FMT_YUVJ420P,
@@ -109,6 +109,16 @@ static int query_formats(AVFilterContext *ctx)
 
     ff_set_common_formats(ctx, ff_make_format_list(pix_fmts));
     return 0;
+}
+
+static av_cold void uninit(AVFilterContext *ctx)
+{
+    LenscorrectionCtx *rect = ctx->priv;
+    int i;
+
+    for (i = 0; i < FF_ARRAY_ELEMS(rect->correction); i++) {
+        av_freep(&rect->correction[i]);
+    }
 }
 
 static int config_props(AVFilterLink *outlink)
@@ -214,5 +224,6 @@ AVFilter ff_vf_lenscorrection = {
     .inputs        = lenscorrection_inputs,
     .outputs       = lenscorrection_outputs,
     .priv_class    = &lenscorrection_class,
+    .uninit        = uninit,
     .flags         = AVFILTER_FLAG_SLICE_THREADS,
 };

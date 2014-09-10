@@ -356,6 +356,8 @@ void avcodec_align_dimensions2(AVCodecContext *s, int *width, int *height,
     case AV_PIX_FMT_GBRP12BE:
     case AV_PIX_FMT_GBRP14LE:
     case AV_PIX_FMT_GBRP14BE:
+    case AV_PIX_FMT_GBRP16LE:
+    case AV_PIX_FMT_GBRP16BE:
         w_align = 16; //FIXME assume 16 pixel per macroblock
         h_align = 16 * 2; // interlaced needs 2 macroblocks height
         break;
@@ -749,6 +751,16 @@ int ff_init_buffer_info(AVCodecContext *avctx, AVFrame *frame)
         packet_sd = av_packet_get_side_data(pkt, AV_PKT_DATA_DISPLAYMATRIX, &size);
         if (packet_sd) {
             frame_sd = av_frame_new_side_data(frame, AV_FRAME_DATA_DISPLAYMATRIX, size);
+            if (!frame_sd)
+                return AVERROR(ENOMEM);
+
+            memcpy(frame_sd->data, packet_sd, size);
+        }
+
+        /* copy the stereo3d format to the output frame */
+        packet_sd = av_packet_get_side_data(pkt, AV_PKT_DATA_STEREO3D, &size);
+        if (packet_sd) {
+            frame_sd = av_frame_new_side_data(frame, AV_FRAME_DATA_STEREO3D, size);
             if (!frame_sd)
                 return AVERROR(ENOMEM);
 
@@ -1434,6 +1446,12 @@ int attribute_align_arg avcodec_open2(AVCodecContext *avctx, const AVCodec *code
         ret = AVERROR(EINVAL);
         goto free_and_end;
     }
+
+#if FF_API_VISMV
+    if (avctx->debug_mv)
+        av_log(avctx, AV_LOG_WARNING, "The 'vismv' option is deprecated, "
+               "see the codecview filter instead.\n");
+#endif
 
     if (av_codec_is_encoder(avctx->codec)) {
         int i;
@@ -2960,6 +2978,10 @@ void avcodec_string(char *buf, int buf_size, AVCodecContext *enc, int encode)
             snprintf(buf + strlen(buf), buf_size - strlen(buf),
                      ", %s", av_get_sample_fmt_name(enc->sample_fmt));
         }
+        if (   enc->bits_per_raw_sample > 0
+            && enc->bits_per_raw_sample != av_get_bytes_per_sample(enc->sample_fmt) * 8)
+            snprintf(buf + strlen(buf), buf_size - strlen(buf),
+                     " (%d bit)", enc->bits_per_raw_sample);
         break;
     case AVMEDIA_TYPE_DATA:
         if (av_log_get_level() >= AV_LOG_DEBUG) {
