@@ -1294,6 +1294,7 @@ LIBAVUTIL_SOURCE += \
 						  $(AVUTIL_DIR)/audio_fifo.c \
 						  $(AVUTIL_DIR)/adler32.c \
 						  $(AVUTIL_DIR)/aes.c \
+						  $(AVUTIL_DIR)/lls.c \
 						  $(AVUTIL_DIR)/lzo.c \
 						  $(AVUTIL_DIR)/fixed_dsp.c \
 						  $(AVUTIL_DIR)/avstring.c \
@@ -1392,6 +1393,7 @@ LIBSWRESAMPLE_SOURCE += $(SWRESAMPLE_DIR)/audioconvert.c \
 			 $(SWRESAMPLE_DIR)/dither.c \
 			 $(SWRESAMPLE_DIR)/rematrix.c \
 			 $(SWRESAMPLE_DIR)/resample.c \
+			 $(SWRESAMPLE_DIR)/options.c \
 			 $(SWRESAMPLE_DIR)/swresample.c
 endif
 
