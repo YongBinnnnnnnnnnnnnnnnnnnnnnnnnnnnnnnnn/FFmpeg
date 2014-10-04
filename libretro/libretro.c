@@ -687,10 +687,47 @@ static bool codec_is_image(enum AVCodecID id)
 {
    switch (id)
    {
+#ifdef OLD_FFMPEG_API
       case CODEC_ID_MJPEG:
       case CODEC_ID_PNG:
+#else
+      case AV_CODEC_ID_MJPEG:
+      case AV_CODEC_ID_PNG:
+#endif
          return true;
 
+      default:
+         return false;
+   }
+}
+
+static bool codec_id_is_ttf(enum AVCodecID id)
+{
+   switch (id)
+   {
+#ifdef OLD_FFMPEG_API
+      case CODEC_ID_TTF;
+#else
+      case AV_CODEC_ID_TTF:
+#endif
+         return true;
+
+      default:
+       return false;
+   }
+}
+
+static bool codec_id_is_ass(enum AVCodecID id)
+{
+   switch (id)
+   {
+#ifdef OLD_FFMPEG_API
+      case CODEC_ID_SSA:
+#else
+      case AV_CODEC_ID_ASS:
+      case AV_CODEC_ID_SSA:
+#endif
+         return true;
       default:
          return false;
    }
@@ -731,7 +768,7 @@ static bool open_codecs(void)
 
          case AVMEDIA_TYPE_SUBTITLE:
 #ifdef HAVE_SSA
-            if (subtitle_streams_num < MAX_STREAMS && fctx->streams[i]->codec->codec_id == CODEC_ID_SSA)
+            if (subtitle_streams_num < MAX_STREAMS && codec_id_is_ass(fctx->streams[i]->codec->codec_id))
             {
                AVCodecContext **s = &sctx[subtitle_streams_num];
                subtitle_streams[subtitle_streams_num] = i;
@@ -755,7 +792,7 @@ static bool open_codecs(void)
          case AVMEDIA_TYPE_ATTACHMENT:
          {
             AVCodecContext *ctx = fctx->streams[i]->codec;
-            if (ctx->codec_id == CODEC_ID_TTF)
+            if (codec_id_is_ttf(ctx->codec_id))
                append_attachment(ctx->extradata, ctx->extradata_size);
             break;
          }
