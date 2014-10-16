@@ -343,6 +343,7 @@ static int ism_write_header(AVFormatContext *s)
         }
         avcodec_copy_context(st->codec, s->streams[i]->codec);
         st->sample_aspect_ratio = s->streams[i]->sample_aspect_ratio;
+        st->time_base = s->streams[i]->time_base;
 
         ctx->pb = avio_alloc_context(os->iobuf, sizeof(os->iobuf), AVIO_FLAG_WRITE, os, NULL, ism_write, ism_seek);
         if (!ctx->pb) {
@@ -515,7 +516,7 @@ static int ism_flush(AVFormatContext *s, int final)
     for (i = 0; i < s->nb_streams; i++) {
         OutputStream *os = &c->streams[i];
         char filename[1024], target_filename[1024], header_filename[1024];
-        int64_t start_pos = os->tail_pos, size;
+        int64_t size;
         int64_t start_ts, duration, moof_size;
         if (!os->packets_written)
             continue;
@@ -533,14 +534,15 @@ static int ism_flush(AVFormatContext *s, int final)
 
         ffurl_close(os->out);
         os->out = NULL;
-        size = os->tail_pos - start_pos;
+        size = os->tail_pos - os->cur_start_pos;
         if ((ret = parse_fragment(s, filename, &start_ts, &duration, &moof_size, size)) < 0)
             break;
         snprintf(header_filename, sizeof(header_filename), "%s/FragmentInfo(%s=%"PRIu64")", os->dirname, os->stream_type_tag, start_ts);
         snprintf(target_filename, sizeof(target_filename), "%s/Fragments(%s=%"PRIu64")", os->dirname, os->stream_type_tag, start_ts);
         copy_moof(s, filename, header_filename, moof_size);
         rename(filename, target_filename);
-        add_fragment(os, target_filename, header_filename, start_ts, duration, start_pos, size);
+        add_fragment(os, target_filename, header_filename, start_ts, duration,
+                     os->cur_start_pos, size);
     }
 
     if (c->window_size || (final && c->remove_at_exit)) {

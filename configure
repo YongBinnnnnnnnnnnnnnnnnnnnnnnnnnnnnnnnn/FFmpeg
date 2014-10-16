@@ -256,11 +256,12 @@ External library support:
   --enable-libzmq          enable message passing via libzmq [no]
   --enable-libzvbi         enable teletext support via libzvbi [no]
   --disable-lzma           disable lzma [autodetect]
-  --enable-decklink        enable Blackmagick DeckLink output [no]
+  --enable-decklink        enable Blackmagick DeckLink I/O support [no]
   --enable-openal          enable OpenAL 1.1 capture support [no]
   --enable-opencl          enable OpenCL code
   --enable-opengl          enable OpenGL rendering [no]
   --enable-openssl         enable openssl [no]
+  --disable-sdl            disable sdl [autodetect]
   --enable-x11grab         enable X11 grabbing [no]
   --disable-xlib           disable xlib [autodetect]
   --disable-zlib           disable zlib [autodetect]
@@ -1244,7 +1245,7 @@ check_host_cpp(){
     log check_host_cpp "$@"
     cat > $TMPC
     log_file $TMPC
-    check_cmd $host_cc $HOSTCPPFLAGS $HOSTCFLAGS "$@" $(hostcc_e $TMPO) $TMPC
+    check_cmd $host_cc $host_cppflags $host_cflags "$@" $(hostcc_e $TMPO) $TMPC
 }
 
 check_host_cppflags(){
@@ -1388,6 +1389,7 @@ EXTERNAL_LIBRARY_LIST="
     opencl
     opengl
     openssl
+    sdl
     x11grab
     xlib
     zlib
@@ -1765,6 +1767,7 @@ TOOLCHAIN_FEATURES="
 "
 
 TYPES_LIST="
+    CONDITION_VARIABLE_Ptr
     socklen_t
     struct_addrinfo
     struct_group_source_req
@@ -2410,7 +2413,7 @@ matroska_muxer_select="riffenc"
 mmf_muxer_select="riffenc"
 mov_demuxer_select="riffdec"
 mov_demuxer_suggest="zlib"
-mov_muxer_select="riffenc rtpenc_chain"
+mov_muxer_select="riffenc rtpenc_chain ac3_parser"
 mp3_demuxer_select="mpegaudio_parser"
 mp4_muxer_select="mov_muxer"
 mpegts_muxer_select="adts_muxer latm_muxer"
@@ -2455,6 +2458,8 @@ bktr_indev_deps_any="dev_bktr_ioctl_bt848_h machine_ioctl_bt848_h dev_video_bktr
 caca_outdev_deps="libcaca"
 decklink_outdev_deps="decklink pthreads"
 decklink_outdev_extralibs="-lstdc++"
+decklink_indev_deps="decklink pthreads"
+decklink_indev_extralibs="-lstdc++"
 dshow_indev_deps="IBaseFilter"
 dshow_indev_extralibs="-lpsapi -lole32 -lstrmiids -luuid"
 dv1394_indev_deps="dv1394"
@@ -2532,7 +2537,6 @@ unix_protocol_deps="sys_un_h"
 unix_protocol_select="network"
 
 # filters
-aconvert_filter_deps="swresample"
 amovie_filter_deps="avcodec avformat"
 aresample_filter_deps="swresample"
 ass_filter_deps="libass"
@@ -3036,8 +3040,9 @@ case "$toolchain" in
         add_ldflags -fprofile-arcs -ftest-coverage
     ;;
     hardened)
-        add_cflags  -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=2 -fno-strict-overflow -fstack-protector-all
-        add_ldflags -Wl,-z,relro -Wl,-z,now
+        add_cppflags -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=2
+        add_cflags   -fno-strict-overflow -fstack-protector-all
+        add_ldflags  -Wl,-z,relro -Wl,-z,now
     ;;
     ?*)
         die "Unknown toolchain $toolchain"
@@ -3842,6 +3847,7 @@ elif enabled x86; then
     case $cpu in
         i[345]86|pentium)
             cpuflags="-march=$cpu"
+            disable i686
             disable mmx
         ;;
         # targets that do NOT support nopl and conditional mov (cmov)
@@ -4032,6 +4038,7 @@ case $target_os in
         enabled shared && ! enabled small && check_cmd $windres --version && enable gnu_windres
         check_ldflags -Wl,--nxcompat
         check_ldflags -Wl,--dynamicbase
+        enabled x86_32 && check_ldflags -Wl,--large-address-aware
         shlibdir_default="$bindir_default"
         SLIBPREF=""
         SLIBSUF=".dll"
@@ -4064,6 +4071,7 @@ case $target_os in
             # Cannot build both shared and static libs with MSVC or icl.
             disable static
         fi
+        enabled x86_32 && check_ldflags -LARGEADDRESSAWARE
         shlibdir_default="$bindir_default"
         SLIBPREF=""
         SLIBSUF=".dll"
@@ -4229,6 +4237,15 @@ probe_libc(){
         eval ${pfx}libc_type=solaris
         add_${pfx}cppflags -D__EXTENSIONS__ -D_XOPEN_SOURCE=600
     fi
+    check_${pfx}cc <<EOF
+#include <time.h>
+void *v = localtime_r;
+EOF
+test "$?" != 0 && check_${pfx}cc -D_POSIX_C_SOURCE=200112 -D_XOPEN_SOURCE=600 <<EOF && add_${pfx}cppflags -D_POSIX_C_SOURCE=200112 -D_XOPEN_SOURCE=600
+#include <time.h>
+void *v = localtime_r;
+EOF
+
 }
 
 probe_libc
@@ -4607,6 +4624,7 @@ fi
 check_code cc arm_neon.h "int16x8_t test = vdupq_n_s16(0)" && enable intrinsics_neon
 
 check_ldflags -Wl,--as-needed
+check_ldflags -Wl,-z,noexecstack
 
 if check_func dlopen; then
     ldl=
@@ -4665,7 +4683,7 @@ check_func  ${malloc_prefix}memalign            && enable memalign
 check_func  ${malloc_prefix}posix_memalign      && enable posix_memalign
 
 check_func  access
-check_func_headers time.h clock_gettime || { check_func_headers time.h clock_gettime -lrt && add_extralibs -lrt; }
+check_func_headers time.h clock_gettime || { check_func_headers time.h clock_gettime -lrt && add_extralibs -lrt && LIBRT="-lrt"; }
 check_func  fcntl
 check_func  fork
 check_func  gethrtime
@@ -4679,7 +4697,7 @@ check_func  mkstemp
 check_func  mmap
 check_func  mprotect
 # Solaris has nanosleep in -lrt, OpenSolaris no longer needs that
-check_func_headers time.h nanosleep || { check_func_headers time.h nanosleep -lrt && add_extralibs -lrt; }
+check_func_headers time.h nanosleep || { check_func_headers time.h nanosleep -lrt && add_extralibs -lrt && LIBRT="-lrt"; }
 check_func  sched_getaffinity
 check_func  setrlimit
 check_struct "sys/stat.h" "struct stat" st_mtim.tv_nsec -D_BSD_SOURCE
@@ -4702,6 +4720,7 @@ check_func_headers windows.h PeekNamedPipe
 check_func_headers windows.h SetConsoleTextAttribute
 check_func_headers windows.h Sleep
 check_func_headers windows.h VirtualAlloc
+check_struct windows.h "CONDITION_VARIABLE" Ptr
 check_func_headers glob.h glob
 enabled xlib &&
     check_func_headers "X11/Xlib.h X11/extensions/Xvlib.h" XvGetPortAttribute -lXv -lX11 -lXext
@@ -4823,7 +4842,8 @@ enabled libnut            && require libnut libnut.h nut_demuxer_init -lnut
 enabled libopencore_amrnb && require libopencore_amrnb opencore-amrnb/interf_dec.h Decoder_Interface_init -lopencore-amrnb
 enabled libopencore_amrwb && require libopencore_amrwb opencore-amrwb/dec_if.h D_IF_init -lopencore-amrwb
 enabled libopencv         && require_pkg_config opencv opencv/cxcore.h cvCreateImageHeader
-enabled libopenjpeg       && { check_lib openjpeg-1.5/openjpeg.h opj_version -lopenjpeg -DOPJ_STATIC ||
+enabled libopenjpeg       && { check_lib openjpeg.h opj_version -lopenmj2 -DOPJ_STATIC ||
+                               check_lib openjpeg-1.5/openjpeg.h opj_version -lopenjpeg -DOPJ_STATIC ||
                                check_lib openjpeg.h opj_version -lopenjpeg -DOPJ_STATIC ||
                                die "ERROR: libopenjpeg not found"; }
 enabled libopus           && require_pkg_config opus opus_multistream.h opus_multistream_decoder_create
@@ -4859,9 +4879,7 @@ enabled libvpx            && {
     enabled libvpx_vp9_decoder && { check_lib2 "vpx/vpx_decoder.h vpx/vp8dx.h" "vpx_codec_vp9_dx" -lvpx || disable libvpx_vp9_decoder; }
     enabled libvpx_vp9_encoder && { check_lib2 "vpx/vpx_encoder.h vpx/vp8cx.h" "vpx_codec_vp9_cx VP9E_SET_AQ_MODE" -lvpx || disable libvpx_vp9_encoder; } }
 enabled libwavpack        && require libwavpack wavpack/wavpack.h WavpackOpenFileOutput  -lwavpack
-enabled libwebp           && require_pkg_config libwebp webp/encode.h WebPGetEncoderVersion &&
-                             { check_code cc webp/encode.h "WebPPicture wp; wp.use_argb++" ||
-                               die "ERROR: libwebp too old."; }
+enabled libwebp           && require_pkg_config "libwebp >= 0.2.0" webp/encode.h WebPGetEncoderVersion
 enabled libx264           && require libx264 x264.h x264_encoder_encode -lx264 &&
                              { check_cpp_condition x264.h "X264_BUILD >= 118" ||
                                die "ERROR: libx264 must be installed and version must be >= 0.118."; }
@@ -4908,21 +4926,26 @@ if enabled libdc1394; then
         enable libdc1394_1; } ||
     die "ERROR: No version of libdc1394 found "
 fi
-
-SDL_CONFIG="${cross_prefix}sdl-config"
-if check_pkg_config sdl SDL_events.h SDL_PollEvent; then
-    check_cpp_condition SDL.h "(SDL_MAJOR_VERSION<<16 | SDL_MINOR_VERSION<<8 | SDL_PATCHLEVEL) >= 0x010201" $sdl_cflags &&
-    check_cpp_condition SDL.h "(SDL_MAJOR_VERSION<<16 | SDL_MINOR_VERSION<<8 | SDL_PATCHLEVEL) < 0x010300" $sdl_cflags &&
-    enable sdl
-else
-  if "${SDL_CONFIG}" --version > /dev/null 2>&1; then
-    sdl_cflags=$("${SDL_CONFIG}" --cflags)
-    sdl_libs=$("${SDL_CONFIG}" --libs)
-    check_func_headers SDL_version.h SDL_Linked_Version $sdl_cflags $sdl_libs &&
-    check_cpp_condition SDL.h "(SDL_MAJOR_VERSION<<16 | SDL_MINOR_VERSION<<8 | SDL_PATCHLEVEL) >= 0x010201" $sdl_cflags &&
-    check_cpp_condition SDL.h "(SDL_MAJOR_VERSION<<16 | SDL_MINOR_VERSION<<8 | SDL_PATCHLEVEL) < 0x010300" $sdl_cflags &&
-    enable sdl
-  fi
+if ! disabled sdl; then
+    SDL_CONFIG="${cross_prefix}sdl-config"
+    if check_pkg_config sdl SDL_events.h SDL_PollEvent; then
+        check_cpp_condition SDL.h "(SDL_MAJOR_VERSION<<16 | SDL_MINOR_VERSION<<8 | SDL_PATCHLEVEL) >= 0x010201" $sdl_cflags &&
+        check_cpp_condition SDL.h "(SDL_MAJOR_VERSION<<16 | SDL_MINOR_VERSION<<8 | SDL_PATCHLEVEL) < 0x010300" $sdl_cflags &&
+        enable sdl
+    else
+        if "${SDL_CONFIG}" --version > /dev/null 2>&1; then
+            sdl_cflags=$("${SDL_CONFIG}" --cflags)
+            sdl_libs=$("${SDL_CONFIG}" --libs)
+            check_func_headers SDL_version.h SDL_Linked_Version $sdl_cflags $sdl_libs &&
+            check_cpp_condition SDL.h "(SDL_MAJOR_VERSION<<16 | SDL_MINOR_VERSION<<8 | SDL_PATCHLEVEL) >= 0x010201" $sdl_cflags &&
+            check_cpp_condition SDL.h "(SDL_MAJOR_VERSION<<16 | SDL_MINOR_VERSION<<8 | SDL_PATCHLEVEL) < 0x010300" $sdl_cflags &&
+            enable sdl
+        elif enabled sdl ; then
+            die "ERROR: SDL not found"
+        else
+            disable sdl
+        fi
+    fi
 fi
 enabled sdl && add_cflags $sdl_cflags && add_extralibs $sdl_libs
 
@@ -5300,7 +5323,6 @@ done
 enabled zlib && add_cppflags -DZLIB_CONST
 
 # conditional library dependencies, in linking order
-enabled aconvert_filter     && prepend avfilter_deps "swresample"
 enabled amovie_filter       && prepend avfilter_deps "avformat avcodec"
 enabled aresample_filter    && prepend avfilter_deps "swresample"
 enabled asyncts_filter      && prepend avfilter_deps "avresample"
@@ -5710,7 +5732,7 @@ Cflags: -I\${includedir}
 EOF
 }
 
-pkgconfig_generate libavutil     "FFmpeg utility library"               "$LIBAVUTIL_VERSION"     "$LIBM"
+pkgconfig_generate libavutil     "FFmpeg utility library"               "$LIBAVUTIL_VERSION"     "$LIBRT $LIBM"
 pkgconfig_generate libavcodec    "FFmpeg codec library"                 "$LIBAVCODEC_VERSION"    "$extralibs"
 pkgconfig_generate libavformat   "FFmpeg container format library"      "$LIBAVFORMAT_VERSION"   "$extralibs"
 pkgconfig_generate libavdevice   "FFmpeg device handling library"       "$LIBAVDEVICE_VERSION"   "$extralibs"

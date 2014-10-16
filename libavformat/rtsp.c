@@ -1150,6 +1150,8 @@ start:
     if (content_length > 0) {
         /* leave some room for a trailing '\0' (useful for simple parsing) */
         content = av_malloc(content_length + 1);
+        if (!content)
+            return AVERROR(ENOMEM);
         ffurl_read_complete(rt->rtsp_hd, content, content_length);
         content[content_length] = '\0';
     }
@@ -1588,10 +1590,13 @@ void ff_rtsp_close_connections(AVFormatContext *s)
 int ff_rtsp_connect(AVFormatContext *s)
 {
     RTSPState *rt = s->priv_data;
-    char host[1024], path[1024], tcpname[1024], cmd[2048], auth[128];
+    char proto[128], host[1024], path[1024];
+    char tcpname[1024], cmd[2048], auth[128];
+    const char *lower_rtsp_proto = "tcp";
     int port, err, tcp_fd;
     RTSPMessageHeader reply1 = {0}, *reply = &reply1;
     int lower_transport_mask = 0;
+    int default_port = RTSP_DEFAULT_PORT;
     char real_challenge[64] = "";
     struct sockaddr_storage peer;
     socklen_t peer_len = sizeof(peer);
@@ -1618,15 +1623,23 @@ int ff_rtsp_connect(AVFormatContext *s)
     rt->lower_transport_mask &= (1 << RTSP_LOWER_TRANSPORT_NB) - 1;
 
 redirect:
-    lower_transport_mask = rt->lower_transport_mask;
     /* extract hostname and port */
-    av_url_split(NULL, 0, auth, sizeof(auth),
+    av_url_split(proto, sizeof(proto), auth, sizeof(auth),
                  host, sizeof(host), &port, path, sizeof(path), s->filename);
+
+    if (!strcmp(proto, "rtsps")) {
+        lower_rtsp_proto         = "tls";
+        default_port             = RTSPS_DEFAULT_PORT;
+        rt->lower_transport_mask = 1 << RTSP_LOWER_TRANSPORT_TCP;
+    }
+
     if (*auth) {
         av_strlcpy(rt->auth, auth, sizeof(rt->auth));
     }
     if (port < 0)
-        port = RTSP_DEFAULT_PORT;
+        port = default_port;
+
+    lower_transport_mask = rt->lower_transport_mask;
 
     if (!lower_transport_mask)
         lower_transport_mask = (1 << RTSP_LOWER_TRANSPORT_NB) - 1;
@@ -1646,7 +1659,7 @@ redirect:
     /* Construct the URI used in request; this is similar to s->filename,
      * but with authentication credentials removed and RTSP specific options
      * stripped out. */
-    ff_url_join(rt->control_uri, sizeof(rt->control_uri), "rtsp", NULL,
+    ff_url_join(rt->control_uri, sizeof(rt->control_uri), proto, NULL,
                 host, port, "%s", path);
 
     if (rt->control_transport == RTSP_MODE_TUNNEL) {
@@ -1725,7 +1738,8 @@ redirect:
         }
     } else {
         /* open the tcp connection */
-        ff_url_join(tcpname, sizeof(tcpname), "tcp", NULL, host, port,
+        ff_url_join(tcpname, sizeof(tcpname), lower_rtsp_proto, NULL,
+                    host, port,
                     "?timeout=%d", rt->stimeout);
         if (ffurl_open(&rt->rtsp_hd, tcpname, AVIO_FLAG_READ_WRITE,
                        &s->interrupt_callback, NULL) < 0) {
@@ -1816,6 +1830,7 @@ redirect:
     ff_rtsp_close_connections(s);
     if (reply->status_code >=300 && reply->status_code < 400 && s->iformat) {
         av_strlcpy(s->filename, reply->location, sizeof(s->filename));
+        rt->session_id[0] = '\0';
         av_log(s, AV_LOG_INFO, "Status %d: Redirecting to %s\n",
                reply->status_code,
                s->filename);

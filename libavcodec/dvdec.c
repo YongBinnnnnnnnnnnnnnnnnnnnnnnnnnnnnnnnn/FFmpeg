@@ -42,6 +42,7 @@
 
 #include "avcodec.h"
 #include "dv.h"
+#include "dv_profile_internal.h"
 #include "dvdata.h"
 #include "get_bits.h"
 #include "idctdsp.h"
@@ -362,7 +363,7 @@ static int dvvideo_decode_frame(AVCodecContext *avctx, void *data,
     int apt, is16_9, ret;
     const AVDVProfile *sys;
 
-    sys = avpriv_dv_frame_profile2(avctx, s->sys, buf, buf_size);
+    sys = ff_dv_frame_profile(avctx, s->sys, buf, buf_size);
     if (!sys || buf_size < sys->frame_size) {
         av_log(avctx, AV_LOG_ERROR, "could not find dv frame profile\n");
         return -1; /* NOTE: we only accept several full frames */
@@ -381,7 +382,7 @@ static int dvvideo_decode_frame(AVCodecContext *avctx, void *data,
     s->frame->key_frame = 1;
     s->frame->pict_type = AV_PICTURE_TYPE_I;
     avctx->pix_fmt      = s->sys->pix_fmt;
-    avctx->time_base    = s->sys->time_base;
+    avctx->framerate    = av_inv_q(s->sys->time_base);
 
     ret = ff_set_dimensions(avctx, s->sys->width, s->sys->height);
     if (ret < 0)

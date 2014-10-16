@@ -865,7 +865,7 @@ static void new_connection(int server_fd, int is_rtsp)
 
  fail:
     if (c) {
-        av_free(c->buffer);
+        av_freep(&c->buffer);
         av_free(c);
     }
     closesocket(fd);
@@ -918,8 +918,8 @@ static void close_connection(HTTPContext *c)
         if (ctx) {
             av_write_trailer(ctx);
             av_dict_free(&ctx->metadata);
-            av_free(ctx->streams[0]);
-            av_free(ctx);
+            av_freep(&ctx->streams[0]);
+            av_freep(&ctx);
         }
         h = c->rtp_handles[i];
         if (h)
@@ -940,7 +940,7 @@ static void close_connection(HTTPContext *c)
     }
 
     for(i=0; i<ctx->nb_streams; i++)
-        av_free(ctx->streams[i]);
+        av_freep(&ctx->streams[i]);
     av_freep(&ctx->streams);
     av_freep(&ctx->priv_data);
 
@@ -955,7 +955,7 @@ static void close_connection(HTTPContext *c)
 
     av_freep(&c->pb_buffer);
     av_freep(&c->packet_buffer);
-    av_free(c->buffer);
+    av_freep(&c->buffer);
     av_free(c);
     nb_connections--;
 }
@@ -1258,24 +1258,13 @@ static int modify_current_stream(HTTPContext *c, char *rates)
     return action_required;
 }
 
-/* XXX: factorize in utils.c ? */
-/* XXX: take care with different space meaning */
-static void skip_spaces(const char **pp)
-{
-    const char *p;
-    p = *pp;
-    while (*p == ' ' || *p == '\t')
-        p++;
-    *pp = p;
-}
-
 static void get_word(char *buf, int buf_size, const char **pp)
 {
     const char *p;
     char *q;
 
     p = *pp;
-    skip_spaces(&p);
+    p += strspn(p, SPACE_CHARS);
     q = buf;
     while (!av_isspace(*p) && *p != '\0') {
         if ((q - buf) < buf_size - 1)
@@ -2811,14 +2800,14 @@ static int http_receive_data(HTTPContext *c)
 
             s->pb = pb;
             if (avformat_open_input(&s, c->stream->feed_filename, fmt_in, NULL) < 0) {
-                av_free(pb);
+                av_freep(&pb);
                 goto fail;
             }
 
             /* Now we have the actual streams */
             if (s->nb_streams != feed->nb_streams) {
                 avformat_close_input(&s);
-                av_free(pb);
+                av_freep(&pb);
                 http_log("Feed '%s' stream number does not match registered feed\n",
                          c->stream->feed_filename);
                 goto fail;
@@ -2831,7 +2820,7 @@ static int http_receive_data(HTTPContext *c)
             }
 
             avformat_close_input(&s);
-            av_free(pb);
+            av_freep(&pb);
         }
         c->buffer_ptr = c->buffer;
     }
@@ -3010,7 +2999,7 @@ static int prepare_sdp_description(FFStream *stream, uint8_t **pbuffer,
     av_sdp_create(&avc, 1, *pbuffer, 2048);
 
  sdp_done:
-    av_free(avc->streams);
+    av_freep(&avc->streams);
     av_dict_free(&avc->metadata);
     av_free(avc);
     av_free(avs);
@@ -3051,7 +3040,7 @@ static void rtsp_cmd_describe(HTTPContext *c, const char *url)
         }
     }
     /* no stream found */
-    rtsp_reply_error(c, RTSP_STATUS_SERVICE); /* XXX: right error ? */
+    rtsp_reply_error(c, RTSP_STATUS_NOT_FOUND);
     return;
 
  found:
@@ -3397,7 +3386,7 @@ static HTTPContext *rtp_new_connection(struct sockaddr_in *from_addr,
 
  fail:
     if (c) {
-        av_free(c->buffer);
+        av_freep(&c->buffer);
         av_free(c);
     }
     return NULL;

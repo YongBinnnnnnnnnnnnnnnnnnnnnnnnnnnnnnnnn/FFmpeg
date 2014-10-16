@@ -51,6 +51,8 @@ typedef struct {
     int seed;
     int8_t *noise;
     int8_t *prev_shift[MAX_RES][3];
+    int rand_shift[MAX_RES];
+    int rand_shift_init;
 } FilterParams;
 
 typedef struct {
@@ -60,8 +62,6 @@ typedef struct {
     int height[4];
     FilterParams all;
     FilterParams param[4];
-    int rand_shift[MAX_RES];
-    int rand_shift_init;
     void (*line_noise)(uint8_t *dst, const uint8_t *src, const int8_t *noise, int len, int shift);
     void (*line_noise_avg)(uint8_t *dst, const uint8_t *src, int len, const int8_t * const *shift);
 } NoiseContext;
@@ -110,7 +110,7 @@ static av_cold int init_noise(NoiseContext *n, int comp)
     if (!noise)
         return AVERROR(ENOMEM);
 
-    av_lfg_init(&fp->lfg, fp->seed);
+    av_lfg_init(&fp->lfg, fp->seed + comp*31415U);
 
     for (i = 0, j = 0; i < MAX_NOISE; i++, j++) {
         if (flags & NOISE_UNIFORM) {
@@ -156,12 +156,6 @@ static av_cold int init_noise(NoiseContext *n, int comp)
     for (i = 0; i < MAX_RES; i++)
         for (j = 0; j < 3; j++)
             fp->prev_shift[i][j] = noise + (av_lfg_get(lfg) & (MAX_SHIFT - 1));
-
-    if (!n->rand_shift_init) {
-        for (i = 0; i < MAX_RES; i++)
-            n->rand_shift[i] = av_lfg_get(lfg) & (MAX_SHIFT - 1);
-        n->rand_shift_init = 1;
-    }
 
     fp->noise = noise;
     return 0;
@@ -337,8 +331,7 @@ static void noise(uint8_t *dst, const uint8_t *src,
     FilterParams *p = &n->param[comp];
     int8_t *noise = p->noise;
     const int flags = p->flags;
-    AVLFG *lfg = &p->lfg;
-    int shift, y;
+    int y;
 
     if (!noise) {
         if (dst != src)
@@ -348,16 +341,17 @@ static void noise(uint8_t *dst, const uint8_t *src,
 
     for (y = start; y < end; y++) {
         const int ix = y & (MAX_RES - 1);
-        if (flags & NOISE_TEMPORAL)
-            shift = av_lfg_get(lfg) & (MAX_SHIFT - 1);
-        else
-            shift = n->rand_shift[ix];
+        int x;
+        for (x=0; x < width; x+= MAX_RES) {
+            int w = FFMIN(width - x, MAX_RES);
+            int shift = p->rand_shift[ix];
 
-        if (flags & NOISE_AVERAGED) {
-            n->line_noise_avg(dst, src, width, (const int8_t**)p->prev_shift[ix]);
-            p->prev_shift[ix][shift & 3] = noise + shift;
-        } else {
-            n->line_noise(dst, src, noise, width, shift);
+            if (flags & NOISE_AVERAGED) {
+                n->line_noise_avg(dst + x, src + x, w, (const int8_t**)p->prev_shift[ix]);
+                p->prev_shift[ix][shift & 3] = noise + shift;
+            } else {
+                n->line_noise(dst + x, src + x, noise, w, shift);
+            }
         }
         dst += dst_linesize;
         src += src_linesize;
@@ -389,6 +383,7 @@ static int filter_frame(AVFilterLink *inlink, AVFrame *inpicref)
     NoiseContext *n = ctx->priv;
     ThreadData td;
     AVFrame *out;
+    int comp, i;
 
     if (av_frame_is_writable(inpicref)) {
         out = inpicref;
@@ -399,6 +394,18 @@ static int filter_frame(AVFilterLink *inlink, AVFrame *inpicref)
             return AVERROR(ENOMEM);
         }
         av_frame_copy_props(out, inpicref);
+    }
+
+    for (comp = 0; comp < 4; comp++) {
+        FilterParams *fp = &n->param[comp];
+
+        if ((!fp->rand_shift_init || (fp->flags & NOISE_TEMPORAL)) && fp->strength) {
+
+            for (i = 0; i < MAX_RES; i++) {
+                fp->rand_shift[i] = av_lfg_get(&fp->lfg) & (MAX_SHIFT - 1);
+            }
+            fp->rand_shift_init = 1;
+        }
     }
 
     td.in = inpicref; td.out = out;

@@ -659,6 +659,17 @@ static void write_frame(AVFormatContext *s, AVPacket *pkt, OutputStream *ost)
     }
 
     if (!(s->oformat->flags & AVFMT_NOTIMESTAMPS)) {
+        if (pkt->dts != AV_NOPTS_VALUE &&
+            pkt->pts != AV_NOPTS_VALUE &&
+            pkt->dts > pkt->pts) {
+            av_log(s, AV_LOG_WARNING, "Invalid DTS: %"PRId64" PTS: %"PRId64" in output stream %d:%d, replacing by guess\n",
+                   pkt->dts, pkt->pts,
+                   ost->file_index, ost->st->index);
+            pkt->pts =
+            pkt->dts = pkt->pts + pkt->dts + ost->last_mux_dts + 1
+                     - FFMIN3(pkt->pts, pkt->dts, ost->last_mux_dts + 1)
+                     - FFMAX3(pkt->pts, pkt->dts, ost->last_mux_dts + 1);
+        }
      if(
         (avctx->codec_type == AVMEDIA_TYPE_AUDIO || avctx->codec_type == AVMEDIA_TYPE_VIDEO) &&
         pkt->dts != AV_NOPTS_VALUE &&
@@ -681,15 +692,6 @@ static void write_frame(AVFormatContext *s, AVPacket *pkt, OutputStream *ost)
         pkt->dts = max;
       }
      }
-        if (pkt->dts != AV_NOPTS_VALUE &&
-            pkt->pts != AV_NOPTS_VALUE &&
-            pkt->dts > pkt->pts) {
-            av_log(s, AV_LOG_WARNING, "Invalid DTS: %"PRId64" PTS: %"PRId64" in output stream %d:%d\n",
-                   pkt->dts, pkt->pts,
-                   ost->file_index, ost->st->index);
-            pkt->pts = AV_NOPTS_VALUE;
-            pkt->dts = AV_NOPTS_VALUE;
-        }
     }
     ost->last_mux_dts = pkt->dts;
 
@@ -1821,17 +1823,9 @@ static int decode_audio(InputStream *ist, AVPacket *pkt, int *got_output)
         for (i = 0; i < nb_filtergraphs; i++)
             if (ist_in_filtergraph(filtergraphs[i], ist)) {
                 FilterGraph *fg = filtergraphs[i];
-                int j;
                 if (configure_filtergraph(fg) < 0) {
                     av_log(NULL, AV_LOG_FATAL, "Error reinitializing filters!\n");
                     exit_program(1);
-                }
-                for (j = 0; j < fg->nb_outputs; j++) {
-                    OutputStream *ost = fg->outputs[j]->ost;
-                    if (ost->enc->type == AVMEDIA_TYPE_AUDIO &&
-                        !(ost->enc->capabilities & CODEC_CAP_VARIABLE_FRAME_SIZE))
-                        av_buffersink_set_frame_size(ost->filter->filter,
-                                                     ost->enc_ctx->frame_size);
                 }
             }
     }
@@ -2130,11 +2124,11 @@ static int process_input_packet(InputStream *ist, const AVPacket *pkt)
             ret = decode_video    (ist, &avpkt, &got_output);
             if (avpkt.duration) {
                 duration = av_rescale_q(avpkt.duration, ist->st->time_base, AV_TIME_BASE_Q);
-            } else if(ist->dec_ctx->time_base.num != 0 && ist->dec_ctx->time_base.den != 0) {
+            } else if(ist->dec_ctx->framerate.num != 0 && ist->dec_ctx->framerate.den != 0) {
                 int ticks= av_stream_get_parser(ist->st) ? av_stream_get_parser(ist->st)->repeat_pict+1 : ist->dec_ctx->ticks_per_frame;
                 duration = ((int64_t)AV_TIME_BASE *
-                                ist->dec_ctx->time_base.num * ticks) /
-                                ist->dec_ctx->time_base.den;
+                                ist->dec_ctx->framerate.den * ticks) /
+                                ist->dec_ctx->framerate.num / ist->dec_ctx->ticks_per_frame;
             } else
                 duration = 0;
 
@@ -2189,11 +2183,11 @@ static int process_input_packet(InputStream *ist, const AVPacket *pkt)
                 ist->next_dts = av_rescale_q(next_dts + 1, av_inv_q(ist->framerate), time_base_q);
             } else if (pkt->duration) {
                 ist->next_dts += av_rescale_q(pkt->duration, ist->st->time_base, AV_TIME_BASE_Q);
-            } else if(ist->dec_ctx->time_base.num != 0) {
+            } else if(ist->dec_ctx->framerate.num != 0) {
                 int ticks= av_stream_get_parser(ist->st) ? av_stream_get_parser(ist->st)->repeat_pict + 1 : ist->dec_ctx->ticks_per_frame;
                 ist->next_dts += ((int64_t)AV_TIME_BASE *
-                                  ist->dec_ctx->time_base.num * ticks) /
-                                  ist->dec_ctx->time_base.den;
+                                  ist->dec_ctx->framerate.den * ticks) /
+                                  ist->dec_ctx->framerate.num / ist->dec_ctx->ticks_per_frame;
             }
             break;
         }
@@ -2643,7 +2637,10 @@ static int transcode_init(void)
                 enc_ctx->frame_size         = dec_ctx->frame_size;
                 enc_ctx->audio_service_type = dec_ctx->audio_service_type;
                 enc_ctx->block_align        = dec_ctx->block_align;
+                enc_ctx->initial_padding    = dec_ctx->delay;
+#if FF_API_AUDIOENC_DELAY
                 enc_ctx->delay              = dec_ctx->delay;
+#endif
                 if((enc_ctx->block_align == 1 || enc_ctx->block_align == 1152 || enc_ctx->block_align == 576) && enc_ctx->codec_id == AV_CODEC_ID_MP3)
                     enc_ctx->block_align= 0;
                 if(enc_ctx->codec_id == AV_CODEC_ID_AC3)
@@ -3473,13 +3470,14 @@ static int process_input(int file_index)
     if (pkt.dts != AV_NOPTS_VALUE)
         pkt.dts *= ist->ts_scale;
 
-    if (pkt.dts != AV_NOPTS_VALUE && ist->next_dts == AV_NOPTS_VALUE && !copy_ts
+    if ((ist->dec_ctx->codec_type == AVMEDIA_TYPE_VIDEO ||
+         ist->dec_ctx->codec_type == AVMEDIA_TYPE_AUDIO) &&
+        pkt.dts != AV_NOPTS_VALUE && ist->next_dts == AV_NOPTS_VALUE && !copy_ts
         && (is->iformat->flags & AVFMT_TS_DISCONT) && ifile->last_ts != AV_NOPTS_VALUE) {
         int64_t pkt_dts = av_rescale_q(pkt.dts, ist->st->time_base, AV_TIME_BASE_Q);
         int64_t delta   = pkt_dts - ifile->last_ts;
-        if(delta < -1LL*dts_delta_threshold*AV_TIME_BASE ||
-            (delta > 1LL*dts_delta_threshold*AV_TIME_BASE &&
-                ist->dec_ctx->codec_type != AVMEDIA_TYPE_SUBTITLE)){
+        if (delta < -1LL*dts_delta_threshold*AV_TIME_BASE ||
+            delta >  1LL*dts_delta_threshold*AV_TIME_BASE){
             ifile->ts_offset -= delta;
             av_log(NULL, AV_LOG_DEBUG,
                    "Inter stream timestamp discontinuity %"PRId64", new offset= %"PRId64"\n",
@@ -3490,14 +3488,15 @@ static int process_input(int file_index)
         }
     }
 
-    if (pkt.dts != AV_NOPTS_VALUE && ist->next_dts != AV_NOPTS_VALUE &&
+    if ((ist->dec_ctx->codec_type == AVMEDIA_TYPE_VIDEO ||
+         ist->dec_ctx->codec_type == AVMEDIA_TYPE_AUDIO) &&
+         pkt.dts != AV_NOPTS_VALUE && ist->next_dts != AV_NOPTS_VALUE &&
         !copy_ts) {
         int64_t pkt_dts = av_rescale_q(pkt.dts, ist->st->time_base, AV_TIME_BASE_Q);
         int64_t delta   = pkt_dts - ist->next_dts;
         if (is->iformat->flags & AVFMT_TS_DISCONT) {
             if (delta < -1LL*dts_delta_threshold*AV_TIME_BASE ||
-                (delta > 1LL*dts_delta_threshold*AV_TIME_BASE &&
-                 ist->dec_ctx->codec_type != AVMEDIA_TYPE_SUBTITLE) ||
+                delta >  1LL*dts_delta_threshold*AV_TIME_BASE ||
                 pkt_dts + AV_TIME_BASE/10 < FFMAX(ist->pts, ist->dts)) {
                 ifile->ts_offset -= delta;
                 av_log(NULL, AV_LOG_DEBUG,
@@ -3509,7 +3508,7 @@ static int process_input(int file_index)
             }
         } else {
             if ( delta < -1LL*dts_error_threshold*AV_TIME_BASE ||
-                (delta > 1LL*dts_error_threshold*AV_TIME_BASE && ist->dec_ctx->codec_type != AVMEDIA_TYPE_SUBTITLE)) {
+                 delta >  1LL*dts_error_threshold*AV_TIME_BASE) {
                 av_log(NULL, AV_LOG_WARNING, "DTS %"PRId64", next:%"PRId64" st:%d invalid dropping\n", pkt.dts, ist->next_dts, pkt.stream_index);
                 pkt.dts = AV_NOPTS_VALUE;
             }
@@ -3517,7 +3516,7 @@ static int process_input(int file_index)
                 int64_t pkt_pts = av_rescale_q(pkt.pts, ist->st->time_base, AV_TIME_BASE_Q);
                 delta   = pkt_pts - ist->next_dts;
                 if ( delta < -1LL*dts_error_threshold*AV_TIME_BASE ||
-                    (delta > 1LL*dts_error_threshold*AV_TIME_BASE && ist->dec_ctx->codec_type != AVMEDIA_TYPE_SUBTITLE)) {
+                     delta >  1LL*dts_error_threshold*AV_TIME_BASE) {
                     av_log(NULL, AV_LOG_WARNING, "PTS %"PRId64", next:%"PRId64" invalid dropping st:%d\n", pkt.pts, ist->next_dts, pkt.stream_index);
                     pkt.pts = AV_NOPTS_VALUE;
                 }
