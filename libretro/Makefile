@@ -125,8 +125,9 @@ ifeq ($(OPENGL),1)
    CFLAGS += -DHAVE_GL
 endif
 HAVE_PTHREADS = 1
-OSXVER = `sw_vers -productVersion | cut -c 4`
-ifneq ($(OSXVER),9)
+   OSXVER = `sw_vers -productVersion | cut -d. -f 2`
+   OSX_LT_MAVERICKS = `(( $(OSXVER) <= 9)) && echo "YES"`
+ifeq ($(OSX_LT_MAVERICKS),"YES")
    fpic += -mmacosx-version-min=10.5
 endif
 
