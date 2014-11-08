@@ -46,6 +46,7 @@
 #include "libavutil/intreadwrite.h"
 #include "libavutil/lzo.h"
 #include "libavutil/mathematics.h"
+#include "libavutil/time_internal.h"
 
 #include "libavcodec/bytestream.h"
 #include "libavcodec/flac.h"
@@ -1507,7 +1508,7 @@ static void matroska_metadata_creation_time(AVDictionary **metadata, int64_t dat
     char buffer[32];
     /* Convert to seconds and adjust by number of seconds between 2001-01-01 and Epoch */
     time_t creation_time = date_utc / 1000000000 + 978307200;
-    struct tm *ptm = gmtime(&creation_time);
+    struct tm tmpbuf, *ptm = gmtime_r(&creation_time, &tmpbuf);
     if (!ptm) return;
     if (strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", ptm))
         av_dict_set(metadata, "creation_time", buffer, 0);
@@ -2912,7 +2913,7 @@ static int matroska_read_seek(AVFormatContext *s, int stream_index,
                               int64_t timestamp, int flags)
 {
     MatroskaDemuxContext *matroska = s->priv_data;
-    MatroskaTrack *tracks = matroska->tracks.elem;
+    MatroskaTrack *tracks = NULL;
     AVStream *st = s->streams[stream_index];
     int i, index, index_sub, index_min;
 
@@ -2942,6 +2943,7 @@ static int matroska_read_seek(AVFormatContext *s, int stream_index,
         goto err;
 
     index_min = index;
+    tracks = matroska->tracks.elem;
     for (i = 0; i < matroska->tracks.nb_elem; i++) {
         tracks[i].audio.pkt_cnt        = 0;
         tracks[i].audio.sub_packet_cnt = 0;

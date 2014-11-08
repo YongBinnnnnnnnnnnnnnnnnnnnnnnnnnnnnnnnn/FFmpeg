@@ -223,7 +223,7 @@ static int flv_write_header(AVFormatContext *s)
             }
             if (enc->codec_id == AV_CODEC_ID_MPEG4 ||
                 enc->codec_id == AV_CODEC_ID_H263) {
-                int error = enc->strict_std_compliance > FF_COMPLIANCE_UNOFFICIAL;
+                int error = s->strict_std_compliance > FF_COMPLIANCE_UNOFFICIAL;
                 av_log(s, error ? AV_LOG_ERROR : AV_LOG_WARNING,
                        "Codec %s is not supported in the official FLV specification,\n", avcodec_get_name(enc->codec_id));
 
@@ -547,6 +547,12 @@ static int flv_write_packet(AVFormatContext *s, AVPacket *pkt)
 
     if (sc->last_ts < ts)
         sc->last_ts = ts;
+
+    if (size + flags_size >= 1<<24) {
+        av_log(s, AV_LOG_ERROR, "Too large packet with size %u >= %u\n",
+               size + flags_size, 1<<24);
+        return AVERROR(EINVAL);
+    }
 
     avio_wb24(pb, size + flags_size);
     avio_wb24(pb, ts & 0xFFFFFF);

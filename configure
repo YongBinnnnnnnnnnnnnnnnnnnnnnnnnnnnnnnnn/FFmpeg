@@ -1659,6 +1659,7 @@ HEADERS_LIST="
     sys_un_h
     sys_videoio_h
     termios_h
+    udplite_h
     unistd_h
     windows_h
     winsock2_h
@@ -1677,7 +1678,6 @@ MATH_FUNCS="
     exp2
     exp2f
     expf
-    fminf
     isinf
     isnan
     ldexpf
@@ -2542,6 +2542,7 @@ tcp_protocol_select="network"
 tls_protocol_deps_any="openssl gnutls"
 tls_protocol_select="tcp_protocol"
 udp_protocol_select="network"
+udplite_protocol_select="network"
 unix_protocol_deps="sys_un_h"
 unix_protocol_select="network"
 
@@ -4525,7 +4526,7 @@ elif enabled parisc; then
 
     if enabled gcc; then
         case $($cc -dumpversion) in
-            4.[3-8].*) check_cflags -fno-optimize-sibling-calls ;;
+            4.[3-9].*) check_cflags -fno-optimize-sibling-calls ;;
         esac
     fi
 
@@ -4745,6 +4746,7 @@ check_header io.h
 check_header libcrystalhd/libcrystalhd_if.h
 check_header mach/mach_time.h
 check_header malloc.h
+check_header net/udplite.h
 check_header poll.h
 check_header sys/mman.h
 check_header sys/param.h
@@ -4810,7 +4812,6 @@ disabled crystalhd || check_lib libcrystalhd/libcrystalhd_if.h DtsCrystalHDVersi
 atan2f_args=2
 ldexpf_args=2
 powf_args=2
-fminf_args=2
 
 for func in $MATH_FUNCS; do
     eval check_mathfunc $func \${${func}_args:-1}
@@ -5040,8 +5041,8 @@ if enabled libxcb; then
             enabled libxcb_xfixes && die "ERROR: libxcb_xfixes not found";
         } && enable libxcb_xfixes; }
 
-    add_cflags $xcb_event_cflags $xcb_shm_cflags $xcb_xfixes_cflags
-    add_extralibs $xcb_event_libs $xcb_shm_libs $xcb_xfixes_libs
+    add_cflags $xcb_cflags $xcb_shm_cflags $xcb_xfixes_cflags
+    add_extralibs $xcb_libs $xcb_shm_libs $xcb_xfixes_libs
 fi
 fi
 
