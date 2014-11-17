@@ -66,7 +66,7 @@ typedef struct NellyMoserEncodeContext {
     uint8_t         (*path)[OPT_SIZE];
 } NellyMoserEncodeContext;
 
-static float pow_table[POW_TABLE_SIZE];     ///< -pow(2, -i / 2048.0 - 3.0);
+static float pow_table[POW_TABLE_SIZE];     ///< pow(2, -i / 2048.0 - 3.0);
 
 static const uint8_t sf_lut[96] = {
      0,  1,  1,  1,  1,  1,  1,  2,  2,  2,  2,  3,  3,  3,  4,  4,
@@ -175,7 +175,7 @@ static av_cold int encode_init(AVCodecContext *avctx)
     /* Generate overlap window */
     ff_init_ff_sine_windows(7);
     for (i = 0; i < POW_TABLE_SIZE; i++)
-        pow_table[i] = -pow(2, -i / 2048.0 - 3.0 + POW_TABLE_OFFSET);
+        pow_table[i] = pow(2, -i / 2048.0 - 3.0 + POW_TABLE_OFFSET);
 
     if (s->avctx->trellis) {
         s->opt  = av_malloc(NELLY_BANDS * OPT_SIZE * sizeof(float  ));
