@@ -573,31 +573,31 @@ void retro_run(void)
             if (use_gl)
             {
 #if defined(GLES)
-            fifo_read(video_decode_fifo, video_frame_temp_buffer, media.width * media.height * sizeof(uint32_t));
-            glBindTexture(GL_TEXTURE_2D, frames[1].tex);
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA,
-                  media.width, media.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, video_frame_temp_buffer);
-            glBindTexture(GL_TEXTURE_2D, 0);
+               fifo_read(video_decode_fifo, video_frame_temp_buffer, media.width * media.height * sizeof(uint32_t));
+               glBindTexture(GL_TEXTURE_2D, frames[1].tex);
+               glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA,
+                     media.width, media.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, video_frame_temp_buffer);
+               glBindTexture(GL_TEXTURE_2D, 0);
 #else
-            glBindBuffer(GL_PIXEL_UNPACK_BUFFER, frames[1].pbo);
-            uint32_t *data = glMapBufferRange(GL_PIXEL_UNPACK_BUFFER,
-                  0, media.width * media.height, GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT);
-            
-            fifo_read(video_decode_fifo, data, media.width * media.height * sizeof(uint32_t));
-            
-            glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
-            glBindTexture(GL_TEXTURE_2D, frames[1].tex);
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA,
-                  media.width, media.height, 0, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, NULL);
-            glBindTexture(GL_TEXTURE_2D, 0);
-            glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+               glBindBuffer(GL_PIXEL_UNPACK_BUFFER, frames[1].pbo);
+               uint32_t *data = glMapBufferRange(GL_PIXEL_UNPACK_BUFFER,
+                     0, media.width * media.height, GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT);
+               
+               fifo_read(video_decode_fifo, data, media.width * media.height * sizeof(uint32_t));
+               
+               glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
+               glBindTexture(GL_TEXTURE_2D, frames[1].tex);
+               glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA,
+                     media.width, media.height, 0, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, NULL);
+               glBindTexture(GL_TEXTURE_2D, 0);
+               glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
 #endif
             }
             else
 #endif
             {
-            fifo_read(video_decode_fifo, video_frame_temp_buffer, media.width * media.height * sizeof(uint32_t));
-            dupe = false;
+               fifo_read(video_decode_fifo, video_frame_temp_buffer, media.width * media.height * sizeof(uint32_t));
+               dupe = false;
             }
          }
 
@@ -610,48 +610,48 @@ void retro_run(void)
 #ifdef HAVE_GL
       if (use_gl)
       {
-      float mix_factor = (min_pts - frames[0].pts) / (frames[1].pts - frames[0].pts);
-      if (!temporal_interpolation)
-         mix_factor = 1.0f;
-
-      glBindFramebuffer(GL_FRAMEBUFFER, hw_render.get_current_framebuffer());
-      glClearColor(0, 0, 0, 1);
-      glClear(GL_COLOR_BUFFER_BIT);
-      glViewport(0, 0, media.width, media.height);
-      glUseProgram(prog);
-
-      glUniform1f(mix_loc, mix_factor);
-      glActiveTexture(GL_TEXTURE1);
-      glBindTexture(GL_TEXTURE_2D, frames[1].tex);
-      glActiveTexture(GL_TEXTURE0);
-      glBindTexture(GL_TEXTURE_2D, frames[0].tex);
-
-
-      glBindBuffer(GL_ARRAY_BUFFER, vbo);
-      glVertexAttribPointer(vertex_loc, 2, GL_FLOAT, GL_FALSE,
-            4 * sizeof(GLfloat), (const GLvoid*)(0 * sizeof(GLfloat)));
-      glVertexAttribPointer(tex_loc, 2, GL_FLOAT, GL_FALSE,
-            4 * sizeof(GLfloat), (const GLvoid*)(2 * sizeof(GLfloat)));
-      glEnableVertexAttribArray(vertex_loc);
-      glEnableVertexAttribArray(tex_loc);
-      glBindBuffer(GL_ARRAY_BUFFER, 0);
-
-      glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-      glDisableVertexAttribArray(vertex_loc);
-      glDisableVertexAttribArray(tex_loc);
-
-      glUseProgram(0);
-      glActiveTexture(GL_TEXTURE1);
-      glBindTexture(GL_TEXTURE_2D, 0);
-      glActiveTexture(GL_TEXTURE0);
-      glBindTexture(GL_TEXTURE_2D, 0);
-
-      video_cb(RETRO_HW_FRAME_BUFFER_VALID, media.width, media.height, media.width * sizeof(uint32_t));
+         float mix_factor = (min_pts - frames[0].pts) / (frames[1].pts - frames[0].pts);
+         if (!temporal_interpolation)
+            mix_factor = 1.0f;
+         
+         glBindFramebuffer(GL_FRAMEBUFFER, hw_render.get_current_framebuffer());
+         glClearColor(0, 0, 0, 1);
+         glClear(GL_COLOR_BUFFER_BIT);
+         glViewport(0, 0, media.width, media.height);
+         glUseProgram(prog);
+         
+         glUniform1f(mix_loc, mix_factor);
+         glActiveTexture(GL_TEXTURE1);
+         glBindTexture(GL_TEXTURE_2D, frames[1].tex);
+         glActiveTexture(GL_TEXTURE0);
+         glBindTexture(GL_TEXTURE_2D, frames[0].tex);
+         
+         
+         glBindBuffer(GL_ARRAY_BUFFER, vbo);
+         glVertexAttribPointer(vertex_loc, 2, GL_FLOAT, GL_FALSE,
+               4 * sizeof(GLfloat), (const GLvoid*)(0 * sizeof(GLfloat)));
+         glVertexAttribPointer(tex_loc, 2, GL_FLOAT, GL_FALSE,
+               4 * sizeof(GLfloat), (const GLvoid*)(2 * sizeof(GLfloat)));
+         glEnableVertexAttribArray(vertex_loc);
+         glEnableVertexAttribArray(tex_loc);
+         glBindBuffer(GL_ARRAY_BUFFER, 0);
+         
+         glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+         glDisableVertexAttribArray(vertex_loc);
+         glDisableVertexAttribArray(tex_loc);
+         
+         glUseProgram(0);
+         glActiveTexture(GL_TEXTURE1);
+         glBindTexture(GL_TEXTURE_2D, 0);
+         glActiveTexture(GL_TEXTURE0);
+         glBindTexture(GL_TEXTURE_2D, 0);
+         
+         video_cb(RETRO_HW_FRAME_BUFFER_VALID, media.width, media.height, media.width * sizeof(uint32_t));
       }
       else
 #endif
       {
-      video_cb(dupe ? NULL : video_frame_temp_buffer, media.width, media.height, media.width * sizeof(uint32_t));
+         video_cb(dupe ? NULL : video_frame_temp_buffer, media.width, media.height, media.width * sizeof(uint32_t));
       }
    }
 #ifdef HAVE_GL_FFT
