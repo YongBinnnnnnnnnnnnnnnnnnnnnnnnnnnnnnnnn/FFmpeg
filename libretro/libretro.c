@@ -45,8 +45,11 @@ static retro_environment_t environ_cb;
 static retro_input_poll_t input_poll_cb;
 static retro_input_state_t input_state_cb;
 
-#define LOG_ERR_GOTO(msg, label) do { \
+#define LOG_ERR(msg) do { \
    log_cb(RETRO_LOG_ERROR, "[FFmpeg]: " msg "\n"); \
+} while(0)
+#define LOG_ERR_GOTO(msg, label) do { \
+   LOG_ERR(msg); \
    goto label; \
 } while(0)
 
@@ -132,6 +135,7 @@ static struct frame frames[2];
 
 #ifdef HAVE_GL
 static bool temporal_interpolation;
+static bool use_gl;
 static struct retro_hw_render_callback hw_render;
 static GLuint prog;
 static GLuint vbo;
@@ -540,9 +544,7 @@ void retro_run(void)
    double min_pts = frame_cnt / media.interpolate_fps + pts_bias;
    if (video_stream >= 0)
    {
-#ifndef HAVE_GL
-      bool dupe = true;
-#endif
+      bool dupe = true; // unused if GL enabled
       // Video
       if (min_pts > frames[1].pts)
       {
@@ -568,6 +570,8 @@ void retro_run(void)
          {
             fifo_read(video_decode_fifo, &pts, sizeof(int64_t));
 #if defined(HAVE_GL)
+            if (use_gl)
+            {
 #if defined(GLES)
             fifo_read(video_decode_fifo, video_frame_temp_buffer, media.width * media.height * sizeof(uint32_t));
             glBindTexture(GL_TEXTURE_2D, frames[1].tex);
@@ -578,9 +582,9 @@ void retro_run(void)
             glBindBuffer(GL_PIXEL_UNPACK_BUFFER, frames[1].pbo);
             uint32_t *data = glMapBufferRange(GL_PIXEL_UNPACK_BUFFER,
                   0, media.width * media.height, GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT);
-
+            
             fifo_read(video_decode_fifo, data, media.width * media.height * sizeof(uint32_t));
-
+            
             glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
             glBindTexture(GL_TEXTURE_2D, frames[1].tex);
             glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA,
@@ -588,10 +592,13 @@ void retro_run(void)
             glBindTexture(GL_TEXTURE_2D, 0);
             glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
 #endif
-#else
+            }
+            else
+#endif
+            {
             fifo_read(video_decode_fifo, video_frame_temp_buffer, media.width * media.height * sizeof(uint32_t));
             dupe = false;
-#endif
+            }
          }
 
          scond_signal(fifo_decode_cond);
@@ -601,6 +608,8 @@ void retro_run(void)
       }
 
 #ifdef HAVE_GL
+      if (use_gl)
+      {
       float mix_factor = (min_pts - frames[0].pts) / (frames[1].pts - frames[0].pts);
       if (!temporal_interpolation)
          mix_factor = 1.0f;
@@ -638,9 +647,12 @@ void retro_run(void)
       glBindTexture(GL_TEXTURE_2D, 0);
 
       video_cb(RETRO_HW_FRAME_BUFFER_VALID, media.width, media.height, media.width * sizeof(uint32_t));
-#else
-      video_cb(dupe ? NULL : video_frame_temp_buffer, media.width, media.height, media.width * sizeof(uint32_t));
+      }
+      else
 #endif
+      {
+      video_cb(dupe ? NULL : video_frame_temp_buffer, media.width, media.height, media.width * sizeof(uint32_t));
+      }
    }
 #ifdef HAVE_GL_FFT
    else if (fft)
@@ -1348,6 +1360,7 @@ bool retro_load_game(const struct retro_game_info *info)
       video_decode_fifo = fifo_new(media.width * media.height * sizeof(uint32_t) * 32);
 
 #ifdef HAVE_GL
+      use_gl = true;
       hw_render.context_reset = context_reset;
       hw_render.context_destroy = context_destroy;
       hw_render.bottom_left_origin = is_glfft;
@@ -1359,7 +1372,10 @@ bool retro_load_game(const struct retro_game_info *info)
       hw_render.context_type = RETRO_HW_CONTEXT_OPENGL;
 #endif
       if (!environ_cb(RETRO_ENVIRONMENT_SET_HW_RENDER, &hw_render))
-         LOG_ERR_GOTO("Cannot initialize HW render.", error);
+      {
+         use_gl=false;
+         LOG_ERR("Cannot initialize HW render.");
+      }
 #endif
    }
    if (audio_streams_num > 0)
