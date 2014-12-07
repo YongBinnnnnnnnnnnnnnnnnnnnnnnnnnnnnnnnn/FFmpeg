@@ -190,21 +190,28 @@ int avcodec_copy_context(AVCodecContext *dest, const AVCodecContext *src)
     }
 
     av_opt_free(dest);
+    av_freep(&dest->rc_override);
+    av_freep(&dest->intra_matrix);
+    av_freep(&dest->inter_matrix);
+    av_freep(&dest->extradata);
+    av_freep(&dest->subtitle_header);
 
     memcpy(dest, src, sizeof(*dest));
     av_opt_copy(dest, src);
 
     dest->priv_data       = orig_priv_data;
+    dest->codec           = orig_codec;
 
-    if (orig_priv_data)
+    if (orig_priv_data && src->codec && src->codec->priv_class &&
+        dest->codec && dest->codec->priv_class)
         av_opt_copy(orig_priv_data, src->priv_data);
 
-    dest->codec           = orig_codec;
 
     /* set values specific to opened codecs back to their default state */
     dest->slice_offset    = NULL;
     dest->hwaccel         = NULL;
     dest->internal        = NULL;
+    dest->coded_frame     = NULL;
 
     /* reallocate values that should be allocated separately */
     dest->extradata       = NULL;
@@ -224,6 +231,7 @@ int avcodec_copy_context(AVCodecContext *dest, const AVCodecContext *src)
     }
     alloc_and_copy_or_fail(extradata,    src->extradata_size,
                            FF_INPUT_BUFFER_PADDING_SIZE);
+    dest->extradata_size  = src->extradata_size;
     alloc_and_copy_or_fail(intra_matrix, 64 * sizeof(int16_t), 0);
     alloc_and_copy_or_fail(inter_matrix, 64 * sizeof(int16_t), 0);
     alloc_and_copy_or_fail(rc_override,  src->rc_override_count * sizeof(*src->rc_override), 0);
@@ -238,11 +246,10 @@ fail:
     av_freep(&dest->intra_matrix);
     av_freep(&dest->inter_matrix);
     av_freep(&dest->extradata);
-#if FF_API_MPV_OPT
-    FF_DISABLE_DEPRECATION_WARNINGS
-    av_freep(&dest->rc_eq);
-    FF_ENABLE_DEPRECATION_WARNINGS
-#endif
+    av_freep(&dest->subtitle_header);
+    dest->subtitle_header_size = 0;
+    dest->extradata_size = 0;
+    av_opt_free(dest);
     return AVERROR(ENOMEM);
 }
 
