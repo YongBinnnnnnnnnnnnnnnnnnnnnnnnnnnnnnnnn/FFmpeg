@@ -272,9 +272,10 @@ static void png_filter_row(PNGDSPContext *dsp, uint8_t *dst, int filter_type,
         if (bpp > 2 && size > 4) {
             /* would write off the end of the array if we let it process
              * the last pixel with bpp=3 */
-            int w = bpp == 4 ? size : size - 3;
+            int w = (bpp & 3) ? size - 3 : size;
+
             if (w > i) {
-                dsp->add_paeth_prediction(dst + i, src + i, last + i, w - i, bpp);
+                dsp->add_paeth_prediction(dst + i, src + i, last + i, size - i, bpp);
                 i = w;
             }
         }
@@ -871,6 +872,9 @@ static int handle_p_frame_apng(AVCodecContext *avctx, PNGDecContext *s,
     uint8_t *pd_last_region = s->dispose_op == APNG_DISPOSE_OP_PREVIOUS ?
                                 s->previous_picture.f->data[0] : s->last_picture.f->data[0];
     int ls = FFMIN(av_image_get_linesize(p->format, s->width, 0), s->width * s->bpp);
+
+    if (ls < 0)
+        return ls;
 
     if (s->blend_op == APNG_BLEND_OP_OVER &&
         avctx->pix_fmt != AV_PIX_FMT_RGBA && avctx->pix_fmt != AV_PIX_FMT_ARGB) {

@@ -194,25 +194,27 @@ Individual component options:
 External library support:
   --enable-avisynth        enable reading of AviSynth script files [no]
   --disable-bzlib          disable bzlib [autodetect]
-  --enable-fontconfig      enable fontconfig
-  --enable-frei0r          enable frei0r video filtering
-  --enable-gnutls          enable gnutls [no]
+  --enable-fontconfig      enable fontconfig, useful for drawtext filter [no]
+  --enable-frei0r          enable frei0r video filtering [no]
+  --enable-gnutls          enable gnutls, needed for https support
+                           if openssl is not used [no]
   --disable-iconv          disable iconv [autodetect]
-  --enable-ladspa          enable LADSPA audio filtering
+  --enable-ladspa          enable LADSPA audio filtering [no]
   --enable-libaacplus      enable AAC+ encoding via libaacplus [no]
-  --enable-libass          enable libass subtitles rendering [no]
+  --enable-libass          enable libass subtitles rendering,
+                           needed for subtitles and ass filter [no]
   --enable-libbluray       enable BluRay reading using libbluray [no]
   --enable-libbs2b         enable bs2b DSP library [no]
-  --enable-libcaca         enable textual display using libcaca
+  --enable-libcaca         enable textual display using libcaca [no]
   --enable-libcelt         enable CELT decoding via libcelt [no]
-  --enable-libcdio         enable audio CD grabbing with libcdio
+  --enable-libcdio         enable audio CD grabbing with libcdio [no]
   --enable-libdc1394       enable IIDC-1394 grabbing using libdc1394
                            and libraw1394 [no]
   --enable-libfaac         enable AAC encoding via libfaac [no]
   --enable-libfdk-aac      enable AAC de/encoding via libfdk-aac [no]
   --enable-libflite        enable flite (voice synthesis) support via libflite [no]
-  --enable-libfreetype     enable libfreetype [no]
-  --enable-libfribidi      enable libfribidi [no]
+  --enable-libfreetype     enable libfreetype, needed for drawtext filter [no]
+  --enable-libfribidi      enable libfribidi, improves drawtext filter [no]
   --enable-libgme          enable Game Music Emu via libgme [no]
   --enable-libgsm          enable GSM de/encoding via libgsm [no]
   --enable-libiec61883     enable iec61883 via libiec61883 [no]
@@ -261,10 +263,12 @@ External library support:
   --enable-libzvbi         enable teletext support via libzvbi [no]
   --disable-lzma           disable lzma [autodetect]
   --enable-decklink        enable Blackmagick DeckLink I/O support [no]
+  --enable-nvenc           enable NVIDIA NVENC support [no]
   --enable-openal          enable OpenAL 1.1 capture support [no]
   --enable-opencl          enable OpenCL code
   --enable-opengl          enable OpenGL rendering [no]
-  --enable-openssl         enable openssl [no]
+  --enable-openssl         enable openssl, needed for https support
+                           if gnutls is not used [no]
   --disable-sdl            disable sdl [autodetect]
   --enable-x11grab         enable X11 grabbing (legacy) [no]
   --disable-xlib           disable xlib [autodetect]
@@ -1397,6 +1401,7 @@ EXTERNAL_LIBRARY_LIST="
     libzmq
     libzvbi
     lzma
+    nvenc
     openal
     opencl
     opengl
@@ -1826,6 +1831,7 @@ HAVE_LIST="
     perl
     pod2man
     sdl
+    section_data_rel_ro
     texi2html
     threads
     vdpau_x11
@@ -2388,12 +2394,14 @@ libwavpack_encoder_deps="libwavpack"
 libwebp_encoder_deps="libwebp"
 libx264_encoder_deps="libx264"
 libx264rgb_encoder_deps="libx264"
+libx264rgb_encoder_select="libx264_encoder"
 libx265_encoder_deps="libx265"
 libxavs_encoder_deps="libxavs"
 libxvid_encoder_deps="libxvid"
 libutvideo_decoder_deps="libutvideo"
 libutvideo_encoder_deps="libutvideo"
 libzvbi_teletext_decoder_deps="libzvbi"
+nvenc_encoder_deps="nvenc"
 
 # demuxers / muxers
 ac3_demuxer_select="ac3_parser"
@@ -2430,7 +2438,7 @@ matroska_muxer_select="riffenc"
 mmf_muxer_select="riffenc"
 mov_demuxer_select="riffdec"
 mov_demuxer_suggest="zlib"
-mov_muxer_select="riffenc rtpenc_chain ac3_parser"
+mov_muxer_select="riffenc rtpenc_chain"
 mp3_demuxer_select="mpegaudio_parser"
 mp4_muxer_select="mov_muxer"
 mpegts_muxer_select="adts_muxer latm_muxer"
@@ -2614,6 +2622,7 @@ vidstabtransform_filter_deps="libvidstab"
 pixfmts_super2xsai_test_deps="super2xsai_filter"
 tinterlace_merge_test_deps="tinterlace_filter"
 tinterlace_pad_test_deps="tinterlace_filter"
+uspp_filter_deps="gpl avcodec"
 zmq_filter_deps="libzmq"
 zoompan_filter_deps="swscale"
 
@@ -3986,6 +3995,7 @@ case $target_os in
         ;;
     android)
         disable symver
+        enable section_data_rel_ro
         SLIB_INSTALL_NAME='$(SLIBNAME)'
         SLIB_INSTALL_LINKS=
         # soname not set on purpose
@@ -4134,6 +4144,7 @@ case $target_os in
         ;;
     linux)
         enable dv1394
+        enable section_data_rel_ro
         ;;
     irix*)
         target_os=irix
@@ -4350,6 +4361,7 @@ die_license_disabled gpl x11grab
 
 die_license_disabled nonfree libaacplus
 die_license_disabled nonfree libfaac
+die_license_disabled nonfree nvenc
 enabled gpl && die_license_disabled_gpl nonfree libfdk_aac
 enabled gpl && die_license_disabled_gpl nonfree openssl
 
@@ -4659,6 +4671,7 @@ fi
 frei0r_filter_extralibs='$ldl'
 frei0r_src_filter_extralibs='$ldl'
 ladspa_filter_extralibs='$ldl'
+nvenc_encoder_extralibs='$ldl'
 
 if ! disabled network; then
     check_func getaddrinfo $network_extralibs
@@ -4883,7 +4896,7 @@ enabled libquvi           && require_pkg_config libquvi quvi/quvi.h quvi_init
 enabled librtmp           && require_pkg_config librtmp librtmp/rtmp.h RTMP_Socket
 enabled libschroedinger   && require_pkg_config schroedinger-1.0 schroedinger/schro.h schro_init
 enabled libshine          && require_pkg_config shine shine/layer3.h shine_encode_buffer
-enabled libsmbclient      && { check_pkg_config smbclient libsmbclient.h smbc_init ||
+enabled libsmbclient      && { use_pkg_config smbclient libsmbclient.h smbc_init ||
                                require smbclient libsmbclient.h smbc_init -lsmbclient; }
 enabled libsoxr           && require libsoxr soxr.h soxr_create -lsoxr
 enabled libssh            && require_pkg_config libssh libssh/sftp.h sftp_init
@@ -4922,6 +4935,8 @@ enabled libxavs           && require libxavs xavs.h xavs_encoder_encode -lxavs
 enabled libxvid           && require libxvid xvid.h xvid_global -lxvidcore
 enabled libzmq            && require_pkg_config libzmq zmq.h zmq_ctx_new
 enabled libzvbi           && require libzvbi libzvbi.h vbi_decoder_new -lzvbi
+enabled nvenc             && { check_header nvEncodeAPI.h || die "ERROR: nvEncodeAPI.h not found."; } &&
+                             { [ $target_os != cygwin ] || die "ERROR: NVENC is not supported on Cygwin currently."; }
 enabled openal            && { { for al_libs in "${OPENAL_LIBS}" "-lopenal" "-lOpenAL32"; do
                                check_lib 'AL/al.h' alGetError "${al_libs}" && break; done } ||
                                die "ERROR: openal not found"; } &&
@@ -5401,6 +5416,7 @@ enabled scale_filter    && prepend avfilter_deps "swscale"
 enabled showspectrum_filter && prepend avfilter_deps "avcodec"
 enabled smartblur_filter    && prepend avfilter_deps "swscale"
 enabled subtitles_filter    && prepend avfilter_deps "avformat avcodec"
+enabled uspp_filter         && prepend avfilter_deps "avcodec"
 
 enabled lavfi_indev         && prepend avdevice_deps "avfilter"
 

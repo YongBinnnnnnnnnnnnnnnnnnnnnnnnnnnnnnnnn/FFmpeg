@@ -1279,7 +1279,8 @@ static int mov_get_h264_codec_tag(AVFormatContext *s, MOVTrack *track)
                 else if (rate == 60) tag = MKTAG('a','i','1','6');
             }
         } else if (   track->enc->width == 4096 && track->enc->height == 2160
-                   || track->enc->width == 3840 && track->enc->height == 2160) {
+                   || track->enc->width == 3840 && track->enc->height == 2160
+                   || track->enc->width == 2048 && track->enc->height == 1080) {
             tag = MKTAG('a','i','v','x');
         }
     }
@@ -4008,7 +4009,7 @@ int ff_mov_write_packet(AVFormatContext *s, AVPacket *pkt)
         } else {
             size = ff_hevc_annexb2mp4(pb, pkt->data, pkt->size, 0, NULL);
         }
-    } else if (enc->codec_id == AV_CODEC_ID_EAC3) {
+    } else if (CONFIG_AC3_PARSER && enc->codec_id == AV_CODEC_ID_EAC3) {
         size = handle_eac3(mov, pkt, trk);
         if (size < 0)
             return size;
