@@ -108,7 +108,7 @@ static int pic_arrays_init(HEVCContext *s, const HEVCSPS *sps)
     if (!s->tab_ipm || !s->cbf_luma || !s->is_pcm)
         goto fail;
 
-    s->filter_slice_edges = av_malloc(ctb_count);
+    s->filter_slice_edges = av_mallocz(ctb_count);
     s->tab_slice_address  = av_malloc_array(pic_size_in_ctb,
                                       sizeof(*s->tab_slice_address));
     s->qp_y_tab           = av_malloc_array(pic_size_in_ctb,
@@ -143,8 +143,12 @@ static void pred_weight_table(HEVCContext *s, GetBitContext *gb)
     uint8_t chroma_weight_l0_flag[16];
     uint8_t luma_weight_l1_flag[16];
     uint8_t chroma_weight_l1_flag[16];
+    int luma_log2_weight_denom;
 
-    s->sh.luma_log2_weight_denom = get_ue_golomb_long(gb);
+    luma_log2_weight_denom = get_ue_golomb_long(gb);
+    if (luma_log2_weight_denom < 0 || luma_log2_weight_denom > 7)
+        av_log(s->avctx, AV_LOG_ERROR, "luma_log2_weight_denom %d is invalid\n", luma_log2_weight_denom);
+    s->sh.luma_log2_weight_denom = av_clip_c(luma_log2_weight_denom, 0, 7);
     if (s->sps->chroma_format_idc != 0) {
         int delta = get_se_golomb(gb);
         s->sh.chroma_log2_weight_denom = av_clip(s->sh.luma_log2_weight_denom + delta, 0, 7);
@@ -2098,7 +2102,6 @@ static int hls_coding_quadtree(HEVCContext *s, int x0, int y0,
     HEVCLocalContext *lc = s->HEVClc;
     const int cb_size    = 1 << log2_cb_size;
     int ret;
-    int qp_block_mask = (1<<(s->sps->log2_ctb_size - s->pps->diff_cu_qp_delta_depth)) - 1;
     int split_cu;
 
     lc->ct_depth = cb_depth;
@@ -2121,6 +2124,7 @@ static int hls_coding_quadtree(HEVCContext *s, int x0, int y0,
     }
 
     if (split_cu) {
+        int qp_block_mask = (1<<(s->sps->log2_ctb_size - s->pps->diff_cu_qp_delta_depth)) - 1;
         const int cb_size_split = cb_size >> 1;
         const int x1 = x0 + cb_size_split;
         const int y1 = y0 + cb_size_split;

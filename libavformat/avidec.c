@@ -794,7 +794,7 @@ static int avi_read_header(AVFormatContext *s)
 //                    avio_skip(pb, size - 5 * 4);
                     break;
                 case AVMEDIA_TYPE_AUDIO:
-                    ret = ff_get_wav_header(pb, st->codec, size);
+                    ret = ff_get_wav_header(pb, st->codec, size, 0);
                     if (ret < 0)
                         return ret;
                     ast->dshow_block_align = st->codec->block_align;
@@ -1847,12 +1847,12 @@ static int avi_read_close(AVFormatContext *s)
                 av_freep(&ast->sub_ctx->pb);
                 avformat_close_input(&ast->sub_ctx);
             }
-            av_free(ast->sub_buffer);
+            av_freep(&ast->sub_buffer);
             av_free_packet(&ast->sub_pkt);
         }
     }
 
-    av_free(avi->dv_demux);
+    av_freep(&avi->dv_demux);
 
     return 0;
 }
