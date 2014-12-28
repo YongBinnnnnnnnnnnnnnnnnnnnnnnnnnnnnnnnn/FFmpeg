@@ -142,6 +142,7 @@ void avfilter_register_all(void)
     REGISTER_FILTER(FRAMEPACK,      framepack,      vf);
     REGISTER_FILTER(FRAMESTEP,      framestep,      vf);
     REGISTER_FILTER(FREI0R,         frei0r,         vf);
+    REGISTER_FILTER(FSPP,           fspp,           vf);
     REGISTER_FILTER(GEQ,            geq,            vf);
     REGISTER_FILTER(GRADFUN,        gradfun,        vf);
     REGISTER_FILTER(HALDCLUT,       haldclut,       vf);
@@ -202,6 +203,7 @@ void avfilter_register_all(void)
     REGISTER_FILTER(SUBTITLES,      subtitles,      vf);
     REGISTER_FILTER(SUPER2XSAI,     super2xsai,     vf);
     REGISTER_FILTER(SWAPUV,         swapuv,         vf);
+    REGISTER_FILTER(TBLEND,         tblend,         vf);
     REGISTER_FILTER(TELECINE,       telecine,       vf);
     REGISTER_FILTER(THUMBNAIL,      thumbnail,      vf);
     REGISTER_FILTER(TILE,           tile,           vf);

@@ -1741,7 +1741,6 @@ SYSTEM_FUNCS="
     lzo1x_999_compress
     mach_absolute_time
     MapViewOfFile
-    MoveFileExA
     memalign
     mkstemp
     mmap
@@ -2583,6 +2582,7 @@ ebur128_filter_deps="gpl"
 flite_filter_deps="libflite"
 frei0r_filter_deps="frei0r dlopen"
 frei0r_src_filter_deps="frei0r dlopen"
+fspp_filter_deps="gpl"
 geq_filter_deps="gpl"
 histeq_filter_deps="gpl"
 hqdn3d_filter_deps="gpl"
@@ -4759,7 +4759,6 @@ check_func_headers windows.h GetProcessAffinityMask
 check_func_headers windows.h GetProcessTimes
 check_func_headers windows.h GetSystemTimeAsFileTime
 check_func_headers windows.h MapViewOfFile
-check_func_headers windows.h MoveFileExA
 check_func_headers windows.h PeekNamedPipe
 check_func_headers windows.h SetConsoleTextAttribute
 check_func_headers windows.h Sleep
