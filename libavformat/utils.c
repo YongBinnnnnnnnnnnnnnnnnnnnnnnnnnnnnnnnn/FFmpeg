@@ -273,6 +273,7 @@ static int set_codec_from_probe_data(AVFormatContext *s, AVStream *st,
         { "aac",       AV_CODEC_ID_AAC,        AVMEDIA_TYPE_AUDIO },
         { "ac3",       AV_CODEC_ID_AC3,        AVMEDIA_TYPE_AUDIO },
         { "dts",       AV_CODEC_ID_DTS,        AVMEDIA_TYPE_AUDIO },
+        { "dvbsub",    AV_CODEC_ID_DVB_SUBTITLE,AVMEDIA_TYPE_SUBTITLE },
         { "eac3",      AV_CODEC_ID_EAC3,       AVMEDIA_TYPE_AUDIO },
         { "h264",      AV_CODEC_ID_H264,       AVMEDIA_TYPE_VIDEO },
         { "hevc",      AV_CODEC_ID_HEVC,       AVMEDIA_TYPE_VIDEO },
@@ -495,7 +496,7 @@ fail:
     ff_id3v2_free_extra_meta(&id3v2_extra_meta);
     av_dict_free(&tmp);
     if (s->pb && !(s->flags & AVFMT_FLAG_CUSTOM_IO))
-        avio_close(s->pb);
+        avio_closep(&s->pb);
     avformat_free_context(s);
     *ps = NULL;
     return ret;
@@ -2842,6 +2843,7 @@ int ff_alloc_extradata(AVCodecContext *avctx, int size)
     int ret;
 
     if (size < 0 || size >= INT32_MAX - FF_INPUT_BUFFER_PADDING_SIZE) {
+        avctx->extradata = NULL;
         avctx->extradata_size = 0;
         return AVERROR(EINVAL);
     }

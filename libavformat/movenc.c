@@ -2507,12 +2507,12 @@ static int mov_write_mvex_tag(AVIOContext *pb, MOVMuxContext *mov)
 static int mov_write_mvhd_tag(AVIOContext *pb, MOVMuxContext *mov)
 {
     int max_track_id = 1, i;
-    int64_t max_track_len_temp, max_track_len = 0;
+    int64_t max_track_len = 0;
     int version;
 
     for (i = 0; i < mov->nb_streams; i++) {
         if (mov->tracks[i].entry > 0 && mov->tracks[i].timescale) {
-            max_track_len_temp = av_rescale_rnd(mov->tracks[i].track_duration,
+            int64_t max_track_len_temp = av_rescale_rnd(mov->tracks[i].track_duration,
                                                 MOV_TIMESCALE,
                                                 mov->tracks[i].timescale,
                                                 AV_ROUND_UP);
@@ -2530,7 +2530,8 @@ static int mov_write_mvhd_tag(AVIOContext *pb, MOVMuxContext *mov)
     }
 
     version = max_track_len < UINT32_MAX ? 0 : 1;
-    (version == 1) ? avio_wb32(pb, 120) : avio_wb32(pb, 108); /* size */
+    avio_wb32(pb, version == 1 ? 120 : 108); /* size */
+
     ffio_wfourcc(pb, "mvhd");
     avio_w8(pb, version);
     avio_wb24(pb, 0); /* flags */
@@ -4161,12 +4162,12 @@ int ff_mov_write_packet(AVFormatContext *s, AVPacket *pkt)
     if (trk->start_dts == AV_NOPTS_VALUE) {
         trk->start_dts = pkt->dts;
         if (trk->frag_discont) {
-            /* Pretend the whole stream started at dts=0, with earlier framgents
+            /* Pretend the whole stream started at dts=0, with earlier fragments
              * already written, with a duration summing up to pkt->dts. */
             trk->frag_start   = pkt->dts;
             trk->start_dts    = 0;
             trk->frag_discont = 0;
-        } else if (mov->fragments >= 1)
+        } else if (pkt->dts && mov->fragments >= 1)
             av_log(s, AV_LOG_WARNING,
                    "Track %d starts with a nonzero dts %"PRId64", while the moov "
                    "already has been written. Set the delay_moov flag to handle "
@@ -4651,7 +4652,8 @@ static int mov_write_header(AVFormatContext *s)
 
     if (mov->use_editlist < 0) {
         mov->use_editlist = 1;
-        if (mov->flags & FF_MOV_FLAG_FRAGMENT) {
+        if (mov->flags & FF_MOV_FLAG_FRAGMENT &&
+            !(mov->flags & FF_MOV_FLAG_DELAY_MOOV)) {
             // If we can avoid needing an edit list by shifting the
             // tracks, prefer that over (trying to) write edit lists
             // in fragmented output.
