@@ -342,7 +342,7 @@ av_cold int ff_mpv_encode_init(AVCodecContext *avctx)
     s->rtp_mode           = !!avctx->rtp_payload_size;
     s->intra_dc_precision = avctx->intra_dc_precision;
 
-    // workaround some differences between how applications specify dc precission
+    // workaround some differences between how applications specify dc precision
     if (s->intra_dc_precision < 0) {
         s->intra_dc_precision += 8;
     } else if (s->intra_dc_precision >= 8)
@@ -1193,8 +1193,8 @@ static int load_input_picture(MpegEncContext *s, const AVFrame *pic_arg)
                     if ((s->width & 15) || (s->height & (vpad-1))) {
                         s->mpvencdsp.draw_edges(dst, dst_stride,
                                                 w, h,
-                                                16>>h_shift,
-                                                vpad>>v_shift,
+                                                16 >> h_shift,
+                                                vpad >> v_shift,
                                                 EDGE_BOTTOM);
                     }
                 }
@@ -2725,7 +2725,7 @@ static int encode_thread(AVCodecContext *c, void *arg){
     int mb_x, mb_y, pdif = 0;
     int chr_h= 16>>s->chroma_y_shift;
     int i, j;
-    MpegEncContext best_s, backup_s;
+    MpegEncContext best_s = { 0 }, backup_s;
     uint8_t bit_buf[2][MAX_MB_BYTES];
     uint8_t bit_buf2[2][MAX_MB_BYTES];
     uint8_t bit_buf_tex[2][MAX_MB_BYTES];

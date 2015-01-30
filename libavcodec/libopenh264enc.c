@@ -69,14 +69,12 @@ static av_cold int svc_encode_init(AVCodecContext *avctx)
     SVCContext *s = avctx->priv_data;
     SEncParamExt param = { 0 };
     int err = AVERROR_UNKNOWN;
-    av_unused OpenH264Version libver;
-    (void)g_strCodecVer; // Avoid warnings due to unused static members from codec_ver.h
 
     // Mingw GCC < 4.7 on x86_32 uses an incorrect/buggy ABI for the WelsGetCodecVersion
     // function (for functions returning larger structs), thus skip the check in those
     // configurations.
 #if !defined(_WIN32) || !defined(__GNUC__) || !ARCH_X86_32 || AV_GCC_VERSION_AT_LEAST(4, 7)
-    libver = WelsGetCodecVersion();
+    OpenH264Version libver = WelsGetCodecVersion();
     if (memcmp(&libver, &g_stCodecVersion, sizeof(libver))) {
         av_log(avctx, AV_LOG_ERROR, "Incorrect library version loaded\n");
         return AVERROR(EINVAL);
@@ -194,7 +192,7 @@ static int svc_encode_frame(AVCodecContext *avctx, AVPacket *avpkt,
             layer_size[layer] += fbi.sLayerInfo[layer].pNalLengthInByte[i];
         size += layer_size[layer];
     }
-    av_log(NULL, AV_LOG_DEBUG, "%d slices\n", fbi.sLayerInfo[fbi.iLayerNum - 1].iNalCount);
+    av_log(avctx, AV_LOG_DEBUG, "%d slices\n", fbi.sLayerInfo[fbi.iLayerNum - 1].iNalCount);
 
     if ((ret = ff_alloc_packet(avpkt, size))) {
         av_log(avctx, AV_LOG_ERROR, "Error getting output packet\n");

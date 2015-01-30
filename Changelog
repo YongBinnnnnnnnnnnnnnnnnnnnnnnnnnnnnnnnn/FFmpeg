@@ -14,6 +14,10 @@ version <next>:
 - OpenH264 encoder wrapper
 - VOC seeking support
 - Closed caption Decoder
+- fspp, uspp, pp7 MPlayer postprocessing filters ported to native filters
+- showpalette filter
+- Twofish symmetric block cipher
+- Support DNx100 (960x720@8)
 
 
 version 2.5:

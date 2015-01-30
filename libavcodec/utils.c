@@ -297,8 +297,8 @@ void avcodec_align_dimensions2(AVCodecContext *s, int *width, int *height,
     case AV_PIX_FMT_YUV422P:
     case AV_PIX_FMT_YUV440P:
     case AV_PIX_FMT_YUV444P:
-    case AV_PIX_FMT_GBRAP:
     case AV_PIX_FMT_GBRP:
+    case AV_PIX_FMT_GBRAP:
     case AV_PIX_FMT_GRAY8:
     case AV_PIX_FMT_GRAY16BE:
     case AV_PIX_FMT_GRAY16LE:
@@ -746,6 +746,7 @@ int ff_init_buffer_info(AVCodecContext *avctx, AVFrame *frame)
         { AV_PKT_DATA_REPLAYGAIN ,   AV_FRAME_DATA_REPLAYGAIN },
         { AV_PKT_DATA_DISPLAYMATRIX, AV_FRAME_DATA_DISPLAYMATRIX },
         { AV_PKT_DATA_STEREO3D,      AV_FRAME_DATA_STEREO3D },
+        { AV_PKT_DATA_AUDIO_SERVICE_TYPE, AV_FRAME_DATA_AUDIO_SERVICE_TYPE },
     };
 
     if (pkt) {
@@ -1854,6 +1855,13 @@ int attribute_align_arg avcodec_encode_audio2(AVCodecContext *avctx,
         memcpy(extended_frame, frame, sizeof(AVFrame));
         extended_frame->extended_data = extended_frame->data;
         frame = extended_frame;
+    }
+
+    /* extract audio service type metadata */
+    if (frame) {
+        AVFrameSideData *sd = av_frame_get_side_data(frame, AV_FRAME_DATA_AUDIO_SERVICE_TYPE);
+        if (sd && sd->size >= sizeof(enum AVAudioServiceType))
+            avctx->audio_service_type = *(enum AVAudioServiceType*)sd->data;
     }
 
     /* check for valid frame size */

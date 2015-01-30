@@ -114,10 +114,11 @@ output pads is called a "sink".
 @anchor{Filtergraph syntax}
 @section Filtergraph syntax
 
-A filtergraph has a textual representation, which is
-recognized by the @option{-filter}/@option{-vf} and @option{-filter_complex}
-options in @command{ffmpeg} and @option{-vf} in @command{ffplay}, and by the
-@code{avfilter_graph_parse()}/@code{avfilter_graph_parse2()} functions defined in
+A filtergraph has a textual representation, which is recognized by the
+@option{-filter}/@option{-vf}/@option{-af} and
+@option{-filter_complex} options in @command{ffmpeg} and
+@option{-vf}/@option{-af} in @command{ffplay}, and by the
+@code{avfilter_graph_parse_ptr()} function defined in
 @file{libavfilter/avfilter.h}.
 
 A filterchain consists of a sequence of connected filters, each one
@@ -193,6 +194,10 @@ instance two input pads. The first output pad of split is labelled
 "L1", the first input pad of overlay is labelled "L2", and the second
 output pad of split is linked to the second input pad of overlay,
 which are both unlabelled.
+
+In a filter description, if the input label of the first filter is not
+specified, "in" is assumed; if the output label of the last filter is not
+specified, "out" is assumed.
 
 In a complete filterchain all the unlabelled filter input and output
 pads must be connected. A filtergraph is considered valid if all the
@@ -4335,6 +4340,49 @@ edgedetect=mode=colormix:high=0
 @end example
 @end itemize
 
+@section eq
+Set brightness, contrast, saturation and approximate gamma adjustment.
+
+The filter accepts the following options:
+
+@table @option
+@item contrast
+Set the contrast value. It accepts a float value in range @code{-2.0} to
+@code{2.0}. The default value is @code{0.0}.
+
+@item brightness
+Set the brightness value. It accepts a float value in range @code{-1.0} to
+@code{1.0}. The default value is @code{0.0}.
+
+@item saturation
+Set the saturation value. It accepts a float value in range @code{0.0} to
+@code{3.0}. The default value is @code{1.0}.
+
+@item gamma
+Set the gamma value. It accepts a float value in range @code{0.1} to @code{10.0}.
+The default value is @code{1.0}.
+
+@item gamma_r
+Set the gamma value for red. It accepts a float value in range
+@code{0.1} to @code{10.0}. The default value is @code{1.0}.
+
+@item gamma_g
+Set the gamma value for green. It accepts a float value in range
+@code{0.1} to @code{10.0}. The default value is @code{1.0}.
+
+@item gamma_b
+Set the gamma value for blue. It accepts a float value in range
+@code{0.1} to @code{10.0}. The default value is @code{1.0}.
+
+@item gamma_weight
+Can be used to reduce the effect of a high gamma value on bright image areas,
+e.g. keep them from getting overamplified and just plain white. It accepts a
+float value in range @code{0.0} to @code{1.0}.A value of @code{0.0} turns the
+gamma correction all the way down while @code{1.0} leaves it at its full strength.
+Default is @code{1.0}.
+
+@end table
+
 @section extractplanes
 
 Extract color channel components from input video stream into
@@ -6236,26 +6284,11 @@ the named filter.
 
 The list of the currently supported filters follows:
 @table @var
-@item eq2
-@item eq
-@item ilpack
-@item pp7
-@item softpulldown
 @end table
 
 The parameter syntax and behavior for the listed filters are the same
 of the corresponding MPlayer filters. For detailed instructions check
 the "VIDEO FILTERS" section in the MPlayer manual.
-
-@subsection Examples
-
-@itemize
-@item
-Adjust gamma, brightness, contrast:
-@example
-mp=eq2=1.0:2:0.5
-@end example
-@end itemize
 
 See also mplayer(1), @url{http://www.mplayerhq.hu/}.
 
@@ -7352,6 +7385,38 @@ telecine NTSC input:
 ffmpeg -i input -vf pullup -r 24000/1001 ...
 @end example
 
+@section qp
+
+Change video quantization parameters (QP).
+
+The filter accepts the following option:
+
+@table @option
+@item qp
+Set expression for quantization parameter.
+@end table
+
+The expression is evaluated through the eval API and can contain, among others,
+the following constants:
+
+@table @var
+@item known
+1 if index is not 129, 0 otherwise.
+
+@item qp
+Sequentional index starting from -129 to 128.
+@end table
+
+@subsection Examples
+
+@itemize
+@item
+Some equation like:
+@example
+qp=2+2*sin(PI*qp)
+@end example
+@end itemize
+
 @section removelogo
 
 Suppress a TV station logo, using an image file to determine which
@@ -8036,6 +8101,19 @@ The Adler-32 checksum (printed in hexadecimal) of all the planes of the input fr
 @item plane_checksum
 The Adler-32 checksum (printed in hexadecimal) of each plane of the input frame,
 expressed in the form "[@var{c0} @var{c1} @var{c2} @var{c3}]".
+@end table
+
+@section showpalette
+
+Displays the 256 colors palette of each frame. This filter is only relevant for
+@var{pal8} pixel format frames.
+
+It accepts the following option:
+
+@table @option
+@item s
+Set the size of the box used to represent one palette color entry. Default is
+@code{30} (for a @code{30x30} pixel box).
 @end table
 
 @section shuffleplanes
@@ -11161,6 +11239,10 @@ Specify gamma. Lower gamma makes the spectrum more contrast, higher gamma
 makes the spectrum having more range. Acceptable value is [1.0, 7.0].
 Default value is @code{3.0}.
 
+@item gamma2
+Specify gamma of bargraph. Acceptable value is [1.0, 7.0].
+Default value is @code{1.0}.
+
 @item fontfile
 Specify font file for use with freetype. If not specified, use embedded font.
 
@@ -11249,6 +11331,12 @@ tlength=100/f*tc/(100/f+tc)
 Custom fontcolor, C-note is colored green, others are colored blue
 @example
 fontcolor='if(mod(floor(midi(f)+0.5),12), 0x0000FF, g(1))'
+@end example
+
+@item
+Custom gamma, now spectrum is linear to the amplitude.
+@example
+gamma=2:gamma2=2
 @end example
 
 @end itemize

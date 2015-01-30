@@ -62,8 +62,6 @@
 #include "libavutil/threadmessage.h"
 #include "libavformat/os_support.h"
 
-#include "libavformat/ffm.h" // not public API
-
 # include "libavfilter/avcodec.h"
 # include "libavfilter/avfilter.h"
 # include "libavfilter/buffersrc.h"
@@ -155,8 +153,9 @@ static struct termios oldtty;
 static int restore_tty;
 #endif
 
+#if HAVE_PTHREADS
 static void free_input_threads(void);
-
+#endif
 
 /* sub2video hack:
    Convert subtitles to video with alpha to insert them in filter graphs.
@@ -883,23 +882,29 @@ static void do_subtitle_out(AVFormatContext *s,
 
 static void do_video_out(AVFormatContext *s,
                          OutputStream *ost,
-                         AVFrame *next_picture)
+                         AVFrame *next_picture,
+                         double sync_ipts)
 {
     int ret, format_video_sync;
     AVPacket pkt;
     AVCodecContext *enc = ost->enc_ctx;
     AVCodecContext *mux_enc = ost->st->codec;
     int nb_frames, nb0_frames, i;
-    double sync_ipts, delta, delta0;
+    double delta, delta0;
     double duration = 0;
     int frame_size = 0;
     InputStream *ist = NULL;
+    AVFilterContext *filter = ost->filter->filter;
 
     if (ost->source_index >= 0)
         ist = input_streams[ost->source_index];
 
+    if (filter->inputs[0]->frame_rate.num > 0 &&
+        filter->inputs[0]->frame_rate.den > 0)
+        duration = 1/(av_q2d(filter->inputs[0]->frame_rate) * av_q2d(enc->time_base));
+
     if(ist && ist->st->start_time != AV_NOPTS_VALUE && ist->st->first_dts != AV_NOPTS_VALUE && ost->frame_rate.num)
-        duration = 1/(av_q2d(ost->frame_rate) * av_q2d(enc->time_base));
+        duration = FFMIN(duration, 1/(av_q2d(ost->frame_rate) * av_q2d(enc->time_base)));
 
     if (!ost->filters_script &&
         !ost->filters &&
@@ -909,7 +914,6 @@ static void do_video_out(AVFormatContext *s,
         duration = lrintf(av_frame_get_pkt_duration(next_picture) * av_q2d(ist->st->time_base) / av_q2d(enc->time_base));
     }
 
-    sync_ipts = next_picture->pts;
     delta0 = sync_ipts - ost->sync_opts;
     delta  = delta0 + duration;
 
@@ -939,7 +943,10 @@ static void do_video_out(AVFormatContext *s,
         format_video_sync != VSYNC_PASSTHROUGH &&
         format_video_sync != VSYNC_DROP) {
         double cor = FFMIN(-delta0, duration);
-        av_log(NULL, AV_LOG_WARNING, "Past duration %f too large\n", -delta0);
+        if (delta0 < -0.6) {
+            av_log(NULL, AV_LOG_WARNING, "Past duration %f too large\n", -delta0);
+        } else
+            av_log(NULL, AV_LOG_DEBUG, "Cliping frame in rate conversion by %f\n", -delta0);
         sync_ipts += cor;
         duration -= cor;
         delta0 += cor;
@@ -1214,7 +1221,6 @@ static int reap_filters(void)
 {
     AVFrame *filtered_frame = NULL;
     int i;
-    int64_t frame_pts;
 
     /* Reap all buffers present in the buffer sinks */
     for (i = 0; i < nb_output_streams; i++) {
@@ -1234,6 +1240,7 @@ static int reap_filters(void)
         filtered_frame = ost->filtered_frame;
 
         while (1) {
+            double float_pts = AV_NOPTS_VALUE; // this is identical to filtered_frame.pts but with higher precision
             ret = av_buffersink_get_frame_flags(filter, filtered_frame,
                                                AV_BUFFERSINK_FLAG_NO_REQUEST);
             if (ret < 0) {
@@ -1247,10 +1254,20 @@ static int reap_filters(void)
                 av_frame_unref(filtered_frame);
                 continue;
             }
-            frame_pts = AV_NOPTS_VALUE;
             if (filtered_frame->pts != AV_NOPTS_VALUE) {
                 int64_t start_time = (of->start_time == AV_NOPTS_VALUE) ? 0 : of->start_time;
-                filtered_frame->pts = frame_pts =
+                AVRational tb = enc->time_base;
+                int extra_bits = av_clip(29 - av_log2(tb.den), 0, 16);
+
+                tb.den <<= extra_bits;
+                float_pts =
+                    av_rescale_q(filtered_frame->pts, filter->inputs[0]->time_base, tb) -
+                    av_rescale_q(start_time, AV_TIME_BASE_Q, tb);
+                float_pts /= 1 << extra_bits;
+                // avoid exact midoints to reduce the chance of rounding differences, this can be removed in case the fps code is changed to work with integers
+                float_pts += FFSIGN(float_pts) * 1.0 / (1<<17);
+
+                filtered_frame->pts =
                     av_rescale_q(filtered_frame->pts, filter->inputs[0]->time_base, enc->time_base) -
                     av_rescale_q(start_time, AV_TIME_BASE_Q, enc->time_base);
             }
@@ -1259,20 +1276,19 @@ static int reap_filters(void)
 
             switch (filter->inputs[0]->type) {
             case AVMEDIA_TYPE_VIDEO:
-                filtered_frame->pts = frame_pts;
                 if (!ost->frame_aspect_ratio.num)
                     enc->sample_aspect_ratio = filtered_frame->sample_aspect_ratio;
 
                 if (debug_ts) {
-                    av_log(NULL, AV_LOG_INFO, "filter -> pts:%s pts_time:%s time_base:%d/%d\n",
+                    av_log(NULL, AV_LOG_INFO, "filter -> pts:%s pts_time:%s exact:%f time_base:%d/%d\n",
                             av_ts2str(filtered_frame->pts), av_ts2timestr(filtered_frame->pts, &enc->time_base),
+                            float_pts,
                             enc->time_base.num, enc->time_base.den);
                 }
 
-                do_video_out(of->ctx, ost, filtered_frame);
+                do_video_out(of->ctx, ost, filtered_frame, float_pts);
                 break;
             case AVMEDIA_TYPE_AUDIO:
-                filtered_frame->pts = frame_pts;
                 if (!(enc->codec->capabilities & CODEC_CAP_PARAM_CHANGE) &&
                     enc->channels != av_frame_get_channels(filtered_frame)) {
                     av_log(NULL, AV_LOG_ERROR,
@@ -1526,10 +1542,15 @@ static void print_report(int is_last_report, int64_t timer_start, int64_t cur_ti
     snprintf(buf + strlen(buf), sizeof(buf) - strlen(buf),
              "%02d:%02d:%02d.%02d ", hours, mins, secs,
              (100 * us) / AV_TIME_BASE);
-    if (bitrate < 0) snprintf(buf + strlen(buf), sizeof(buf) - strlen(buf),
-                              "bitrate=N/A");
-    else             snprintf(buf + strlen(buf), sizeof(buf) - strlen(buf),
-                              "bitrate=%6.1fkbits/s", bitrate);
+
+    if (bitrate < 0) {
+        snprintf(buf + strlen(buf), sizeof(buf) - strlen(buf),"bitrate=N/A");
+        av_bprintf(&buf_script, "bitrate=N/A\n");
+    }else{
+        snprintf(buf + strlen(buf), sizeof(buf) - strlen(buf),"bitrate=%6.1fkbits/s", bitrate);
+        av_bprintf(&buf_script, "bitrate=%6.1fkbits/s\n", bitrate);
+    }
+
     if (total_size < 0) av_bprintf(&buf_script, "total_size=N/A\n");
     else                av_bprintf(&buf_script, "total_size=%"PRId64"\n", total_size);
     av_bprintf(&buf_script, "out_time_ms=%"PRId64"\n", pts);
@@ -2906,6 +2927,8 @@ static int transcode_init(void)
                     enc_ctx->height    = input_streams[ost->source_index]->st->codec->height;
                 }
                 break;
+            case AVMEDIA_TYPE_DATA:
+                break;
             default:
                 abort();
                 break;
@@ -2943,6 +2966,37 @@ static int transcode_init(void)
                     }
                 }
             }
+        }
+
+        if (ost->disposition) {
+            static const AVOption opts[] = {
+                { "disposition"         , NULL, 0, AV_OPT_TYPE_FLAGS, { .i64 = 0 }, INT64_MIN, INT64_MAX, .unit = "flags" },
+                { "default"             , NULL, 0, AV_OPT_TYPE_CONST, { .i64 = AV_DISPOSITION_DEFAULT           },    .unit = "flags" },
+                { "dub"                 , NULL, 0, AV_OPT_TYPE_CONST, { .i64 = AV_DISPOSITION_DUB               },    .unit = "flags" },
+                { "original"            , NULL, 0, AV_OPT_TYPE_CONST, { .i64 = AV_DISPOSITION_ORIGINAL          },    .unit = "flags" },
+                { "comment"             , NULL, 0, AV_OPT_TYPE_CONST, { .i64 = AV_DISPOSITION_COMMENT           },    .unit = "flags" },
+                { "lyrics"              , NULL, 0, AV_OPT_TYPE_CONST, { .i64 = AV_DISPOSITION_LYRICS            },    .unit = "flags" },
+                { "karaoke"             , NULL, 0, AV_OPT_TYPE_CONST, { .i64 = AV_DISPOSITION_KARAOKE           },    .unit = "flags" },
+                { "forced"              , NULL, 0, AV_OPT_TYPE_CONST, { .i64 = AV_DISPOSITION_FORCED            },    .unit = "flags" },
+                { "hearing_impaired"    , NULL, 0, AV_OPT_TYPE_CONST, { .i64 = AV_DISPOSITION_HEARING_IMPAIRED  },    .unit = "flags" },
+                { "visual_impaired"     , NULL, 0, AV_OPT_TYPE_CONST, { .i64 = AV_DISPOSITION_VISUAL_IMPAIRED   },    .unit = "flags" },
+                { "clean_effects"       , NULL, 0, AV_OPT_TYPE_CONST, { .i64 = AV_DISPOSITION_CLEAN_EFFECTS     },    .unit = "flags" },
+                { "captions"            , NULL, 0, AV_OPT_TYPE_CONST, { .i64 = AV_DISPOSITION_CAPTIONS          },    .unit = "flags" },
+                { "descriptions"        , NULL, 0, AV_OPT_TYPE_CONST, { .i64 = AV_DISPOSITION_DESCRIPTIONS      },    .unit = "flags" },
+                { "metadata"            , NULL, 0, AV_OPT_TYPE_CONST, { .i64 = AV_DISPOSITION_METADATA          },    .unit = "flags" },
+                { NULL },
+            };
+            static const AVClass class = {
+                .class_name = "",
+                .item_name  = av_default_item_name,
+                .option     = opts,
+                .version    = LIBAVUTIL_VERSION_INT,
+            };
+            const AVClass *pclass = &class;
+
+            ret = av_opt_eval_flags(&pclass, &opts[0], ost->disposition, &ost->st->disposition);
+            if (ret < 0)
+                goto dump_format;
         }
     }
 
@@ -3855,6 +3909,7 @@ static int transcode(void)
                 }
                 av_freep(&ost->forced_kf_pts);
                 av_freep(&ost->apad);
+                av_freep(&ost->disposition);
                 av_dict_free(&ost->encoder_opts);
                 av_dict_free(&ost->swr_opts);
                 av_dict_free(&ost->resample_opts);

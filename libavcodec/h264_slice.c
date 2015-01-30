@@ -529,6 +529,7 @@ int ff_h264_update_thread_context(AVCodecContext *dst,
 
         av_freep(&h->rbsp_buffer[0]);
         av_freep(&h->rbsp_buffer[1]);
+        ff_h264_unref_picture(h, &h->last_pic_for_ec);
         memcpy(h, h1, offsetof(H264Context, intra_pcm_ptr));
         memcpy(&h->cabac, &h1->cabac,
                sizeof(H264Context) - offsetof(H264Context, cabac));
@@ -1206,9 +1207,6 @@ static int h264_slice_header_init(H264Context *h, int reinit)
                 goto fail;
             }
             c->avctx             = h->avctx;
-            if (CONFIG_ERROR_RESILIENCE) {
-                c->mecc              = h->mecc;
-            }
             c->vdsp              = h->vdsp;
             c->h264dsp           = h->h264dsp;
             c->h264qpel          = h->h264qpel;
@@ -1225,7 +1223,6 @@ static int h264_slice_header_init(H264Context *h, int reinit)
             c->chroma_y_shift    = h->chroma_y_shift;
             c->qscale            = h->qscale;
             c->droppable         = h->droppable;
-            c->data_partitioning = h->data_partitioning;
             c->low_delay         = h->low_delay;
             c->mb_width          = h->mb_width;
             c->mb_height         = h->mb_height;
@@ -1662,9 +1659,11 @@ int ff_h264_decode_slice_header(H264Context *h, H264Context *h0)
             if (!FIELD_PICTURE(h) || h->picture_structure == last_pic_structure) {
                 /* Previous field is unmatched. Don't display it, but let it
                  * remain for reference if marked as such. */
+                h0->missing_fields ++;
                 h0->cur_pic_ptr = NULL;
                 h0->first_field = FIELD_PICTURE(h);
             } else {
+                h0->missing_fields = 0;
                 if (h0->cur_pic_ptr->frame_num != h->frame_num) {
                     ff_thread_report_progress(&h0->cur_pic_ptr->tf, INT_MAX,
                                               h0->picture_structure==PICT_BOTTOM_FIELD);

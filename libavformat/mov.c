@@ -29,13 +29,13 @@
 
 #include "libavutil/attributes.h"
 #include "libavutil/channel_layout.h"
-#include "libavutil/display.h"
 #include "libavutil/intreadwrite.h"
 #include "libavutil/intfloat.h"
 #include "libavutil/mathematics.h"
 #include "libavutil/time_internal.h"
 #include "libavutil/avstring.h"
 #include "libavutil/dict.h"
+#include "libavutil/display.h"
 #include "libavutil/opt.h"
 #include "libavutil/timecode.h"
 #include "libavcodec/ac3tab.h"
@@ -637,11 +637,17 @@ static int mov_read_esds(MOVContext *c, AVIOContext *pb, MOVAtom atom)
 static int mov_read_dac3(MOVContext *c, AVIOContext *pb, MOVAtom atom)
 {
     AVStream *st;
+    enum AVAudioServiceType *ast;
     int ac3info, acmod, lfeon, bsmod;
 
     if (c->fc->nb_streams < 1)
         return 0;
     st = c->fc->streams[c->fc->nb_streams-1];
+
+    ast = (enum AVAudioServiceType*)ff_stream_new_side_data(st, AV_PKT_DATA_AUDIO_SERVICE_TYPE,
+                                                            sizeof(*ast));
+    if (!ast)
+        return AVERROR(ENOMEM);
 
     ac3info = avio_rb24(pb);
     bsmod = (ac3info >> 14) & 0x7;
@@ -651,9 +657,11 @@ static int mov_read_dac3(MOVContext *c, AVIOContext *pb, MOVAtom atom)
     st->codec->channel_layout = avpriv_ac3_channel_layout_tab[acmod];
     if (lfeon)
         st->codec->channel_layout |= AV_CH_LOW_FREQUENCY;
-    st->codec->audio_service_type = bsmod;
+    *ast = bsmod;
     if (st->codec->channels > 1 && bsmod == 0x7)
-        st->codec->audio_service_type = AV_AUDIO_SERVICE_TYPE_KARAOKE;
+        *ast = AV_AUDIO_SERVICE_TYPE_KARAOKE;
+
+    st->codec->audio_service_type = *ast;
 
     return 0;
 }
@@ -661,11 +669,17 @@ static int mov_read_dac3(MOVContext *c, AVIOContext *pb, MOVAtom atom)
 static int mov_read_dec3(MOVContext *c, AVIOContext *pb, MOVAtom atom)
 {
     AVStream *st;
+    enum AVAudioServiceType *ast;
     int eac3info, acmod, lfeon, bsmod;
 
     if (c->fc->nb_streams < 1)
         return 0;
     st = c->fc->streams[c->fc->nb_streams-1];
+
+    ast = (enum AVAudioServiceType*)ff_stream_new_side_data(st, AV_PKT_DATA_AUDIO_SERVICE_TYPE,
+                                                            sizeof(*ast));
+    if (!ast)
+        return AVERROR(ENOMEM);
 
     /* No need to parse fields for additional independent substreams and its
      * associated dependent substreams since libavcodec's E-AC-3 decoder
@@ -679,9 +693,11 @@ static int mov_read_dec3(MOVContext *c, AVIOContext *pb, MOVAtom atom)
     if (lfeon)
         st->codec->channel_layout |= AV_CH_LOW_FREQUENCY;
     st->codec->channels = av_get_channel_layout_nb_channels(st->codec->channel_layout);
-    st->codec->audio_service_type = bsmod;
+    *ast = bsmod;
     if (st->codec->channels > 1 && bsmod == 0x7)
-        st->codec->audio_service_type = AV_AUDIO_SERVICE_TYPE_KARAOKE;
+        *ast = AV_AUDIO_SERVICE_TYPE_KARAOKE;
+
+    st->codec->audio_service_type = *ast;
 
     return 0;
 }
@@ -1658,6 +1674,13 @@ static int mov_parse_stsd_data(MOVContext *c, AVIOContext *pb,
                 st->codec->flags2 |= CODEC_FLAG2_DROP_FRAME_TIMECODE;
             st->codec->time_base.den = st->codec->extradata[16]; /* number of frame */
             st->codec->time_base.num = 1;
+            /* adjust for per frame dur in counter mode */
+            if (tmcd_ctx->tmcd_flags & 0x0008) {
+                int timescale = AV_RB32(st->codec->extradata + 8);
+                int framedur = AV_RB32(st->codec->extradata + 12);
+                st->codec->time_base.den *= timescale;
+                st->codec->time_base.num *= framedur;
+            }
             if (size > 30) {
                 uint32_t len = AV_RB32(st->codec->extradata + 18); /* name atom length */
                 uint32_t format = AV_RB32(st->codec->extradata + 22);
@@ -2784,7 +2807,6 @@ static int mov_read_tkhd(MOVContext *c, AVIOContext *pb, MOVAtom atom)
     int i;
     int width;
     int height;
-    int64_t disp_transform[2];
     int display_matrix[3][3];
     AVStream *st;
     MOVStreamContext *sc;
@@ -2867,25 +2889,20 @@ static int mov_read_tkhd(MOVContext *c, AVIOContext *pb, MOVAtom atom)
     }
 
     // transform the display width/height according to the matrix
-    // skip this if the display matrix is the default identity matrix
-    // or if it is rotating the picture, ex iPhone 3GS
     // to keep the same scale, use [width height 1<<16]
-    if (width && height &&
-        ((display_matrix[0][0] != 65536  ||
-          display_matrix[1][1] != 65536) &&
-         !display_matrix[0][1] &&
-         !display_matrix[1][0] &&
-         !display_matrix[2][0] && !display_matrix[2][1])) {
-        for (i = 0; i < 2; i++)
-            disp_transform[i] =
-                (int64_t)  width  * display_matrix[0][i] +
-                (int64_t)  height * display_matrix[1][i] +
-                ((int64_t) display_matrix[2][i] << 16);
+    if (width && height && sc->display_matrix) {
+        double disp_transform[2];
 
-        //sample aspect ratio is new width/height divided by old width/height
-        st->sample_aspect_ratio = av_d2q(
-            ((double) disp_transform[0] * height) /
-            ((double) disp_transform[1] * width), INT_MAX);
+#define SQR(a) ((a)*(double)(a))
+        for (i = 0; i < 2; i++)
+            disp_transform[i] = sqrt(SQR(display_matrix[i][0]) + SQR(display_matrix[i][1]));
+
+        if (disp_transform[0] > 0       && disp_transform[1] > 0 &&
+            disp_transform[0] < (1<<24) && disp_transform[1] < (1<<24) &&
+            fabs((disp_transform[0] / disp_transform[1]) - 1.0) > 0.01)
+            st->sample_aspect_ratio = av_d2q(
+                disp_transform[0] / disp_transform[1],
+                INT_MAX);
     }
     return 0;
 }
