@@ -40,7 +40,7 @@
 # include <openjpeg.h>
 #endif
 
-typedef struct {
+typedef struct LibOpenJPEGContext {
     AVClass *avclass;
     opj_image_t *image;
     opj_cparameters_t enc_params;
@@ -250,7 +250,7 @@ static av_cold int libopenjpeg_encode_init(AVCodecContext *avctx)
 fail:
     opj_image_destroy(ctx->image);
     ctx->image = NULL;
-    av_freep(&avctx->coded_frame);
+    av_frame_free(&avctx->coded_frame);
     return err;
 }
 
@@ -605,7 +605,7 @@ static av_cold int libopenjpeg_encode_close(AVCodecContext *avctx)
 
     opj_image_destroy(ctx->image);
     ctx->image = NULL;
-    av_freep(&avctx->coded_frame);
+    av_frame_free(&avctx->coded_frame);
     return 0;
 }
 

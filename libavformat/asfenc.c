@@ -183,7 +183,7 @@
 
 #define DATA_HEADER_SIZE 50
 
-typedef struct {
+typedef struct ASFContext {
     uint32_t seqno;
     int is_streamed;
     ASFStream streams[128];              ///< it's max number and it's not that big
@@ -660,6 +660,7 @@ static int asf_write_header(AVFormatContext *s)
      * It is needed to use asf as a streamable format. */
     if (asf_write_header1(s, 0, DATA_HEADER_SIZE) < 0) {
         //av_free(asf);
+        av_freep(&asf->index_ptr);
         return -1;
     }
 

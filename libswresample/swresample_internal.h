@@ -88,6 +88,7 @@ struct Resampler {
 };
 
 extern struct Resampler const swri_resampler;
+extern struct Resampler const swri_soxr_resampler;
 
 struct SwrContext {
     const AVClass *av_class;                        ///< AVClass used for AVOption and av_log()
@@ -183,7 +184,7 @@ void swri_noise_shaping_double(SwrContext *s, AudioData *dsts, const AudioData *
 int swri_rematrix_init(SwrContext *s);
 void swri_rematrix_free(SwrContext *s);
 int swri_rematrix(SwrContext *s, AudioData *out, AudioData *in, int len, int mustcopy);
-void swri_rematrix_init_x86(struct SwrContext *s);
+int swri_rematrix_init_x86(struct SwrContext *s);
 
 void swri_get_dither(SwrContext *s, void *dst, int len, unsigned seed, enum AVSampleFormat noise_fmt);
 int swri_dither_init(SwrContext *s, enum AVSampleFormat out_fmt, enum AVSampleFormat in_fmt);
@@ -200,4 +201,5 @@ void swri_audio_convert_init_x86(struct AudioConvert *ac,
                                  enum AVSampleFormat out_fmt,
                                  enum AVSampleFormat in_fmt,
                                  int channels);
+
 #endif

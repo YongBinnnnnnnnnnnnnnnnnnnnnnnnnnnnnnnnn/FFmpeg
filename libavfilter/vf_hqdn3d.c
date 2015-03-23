@@ -155,7 +155,7 @@ static int denoise_depth(HQDN3DContext *s,
 
 #define denoise(...)                                                          \
     do {                                                                      \
-        int ret = AVERROR_INVALIDDATA;                                        \
+        int ret = AVERROR_BUG;                                                \
         switch (s->depth) {                                                   \
             case  8: ret = denoise_depth(__VA_ARGS__,  8); break;             \
             case  9: ret = denoise_depth(__VA_ARGS__,  9); break;             \
@@ -253,10 +253,10 @@ static int query_formats(AVFilterContext *ctx)
         AV_PIX_FMT_YUV444P16,
         AV_PIX_FMT_NONE
     };
-
-    ff_set_common_formats(ctx, ff_make_format_list(pix_fmts));
-
-    return 0;
+    AVFilterFormats *fmts_list = ff_make_format_list(pix_fmts);
+    if (!fmts_list)
+        return AVERROR(ENOMEM);
+    return ff_set_common_formats(ctx, fmts_list);
 }
 
 static int config_input(AVFilterLink *inlink)
