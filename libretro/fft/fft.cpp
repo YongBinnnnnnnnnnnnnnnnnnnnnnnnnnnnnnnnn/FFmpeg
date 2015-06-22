@@ -508,7 +508,7 @@ static inline double kaiser_besseli0(double x)
 
 static inline double kaiser_window(double index, double beta)
 {
-   return kaiser_besseli0(beta * glm::sqrt(1 - index * index));
+   return kaiser_besseli0(beta * sqrtf(1 - index * index));
 }
 
 void GLFFT::init_texture(GLuint &tex, GLenum format, unsigned width, unsigned height, unsigned levels, GLenum mag, GLenum min)
