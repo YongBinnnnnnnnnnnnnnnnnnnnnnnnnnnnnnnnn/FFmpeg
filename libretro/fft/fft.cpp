@@ -264,9 +264,10 @@ GLuint GLFFT::compile_program(const char *vertex_source, const char *fragment_so
    glGetProgramiv(prog, GL_LINK_STATUS, &status);
    if (!status)
    {
-      log_cb(RETRO_LOG_ERROR, "Failed to link.\n");
       char log_info[8 * 1024];
       GLsizei log_len;
+
+      log_cb(RETRO_LOG_ERROR, "Failed to link.\n");
       glGetProgramInfoLog(prog, sizeof(log_info), &log_len, log_info);
       log_cb(RETRO_LOG_ERROR, "ERROR: %s\n", log_info);
    }
@@ -318,6 +319,8 @@ void GLFFT::render(GLuint backbuffer, unsigned width, unsigned height)
 
 void GLFFT::step_fft(const GLshort *audio_buffer, unsigned frames)
 {
+   unsigned i;
+
    glEnable(GL_DEPTH_TEST);
    glEnable(GL_CULL_FACE);
    glBindVertexArray(vao);
@@ -347,7 +350,8 @@ void GLFFT::step_fft(const GLshort *audio_buffer, unsigned frames)
 
    // Perform FFT of new block.
    glViewport(0, 0, fft_size, 1);
-   for (unsigned i = 0; i < fft_steps; i++)
+
+   for (i = 0; i < fft_steps; i++)
    {
       if (i == fft_steps - 1)
       {
@@ -414,19 +418,23 @@ static inline unsigned log2i(unsigned x)
 
 static inline unsigned bitinverse(unsigned x, unsigned size)
 {
+   unsigned i;
    unsigned size_log2 = log2i(size);
    unsigned ret = 0;
-   for (unsigned i = 0; i < size_log2; i++)
+
+   for (i = 0; i < size_log2; i++)
       ret |= ((x >> i) & 0x1) << (size_log2 - 1 - i);
    return ret;
 }
 
 void GLFFT::build_fft_params(GLuint *buffer, unsigned step, unsigned size)
 {
+   unsigned i, j;
    unsigned step_size = 1 << step;
-   for (unsigned i = 0; i < size; i += step_size << 1)
+
+   for (i = 0; i < size; i += step_size << 1)
    {
-      for (unsigned j = i; j < i + step_size; j++)
+      for (j = i; j < i + step_size; j++)
       {
          int s = j - i;
          float phase = -1.0f * (float)s / step_size;
@@ -542,13 +550,13 @@ void GLFFT::init_target(Target &target, GLenum format, unsigned width, unsigned 
 
 void GLFFT::init_fft()
 {
+   static const GLfloat unity[] = { 0.0f, 0.0f, 1.0f, 1.0f };
+
    prog_real = compile_program(vertex_program, fragment_program_real);
    prog_complex = compile_program(vertex_program, fragment_program_complex);
    prog_resolve = compile_program(vertex_program, fragment_program_resolve);
    prog_blur = compile_program(vertex_program, fragment_program_blur);
    GL_CHECK_ERROR();
-
-   static const GLfloat unity[] = { 0.0f, 0.0f, 1.0f, 1.0f };
 
    glUseProgram(prog_real);
    glUniform1i(glGetUniformLocation(prog_real, "sTexture"), 0);
@@ -616,14 +624,17 @@ void GLFFT::init_fft()
 
 void GLFFT::init_block()
 {
+   unsigned x, y;
+   int pos = 0;
+
    block.prog = compile_program(vertex_program_heightmap, fragment_program_heightmap);
    glUseProgram(block.prog);
    glUniform1i(glGetUniformLocation(block.prog, "sHeight"), 0);
 
    std::vector<GLushort> block_vertices(2 * fft_block_size * fft_depth);
-   for (unsigned y = 0; y < fft_depth; y++)
+   for (y = 0; y < fft_depth; y++)
    {
-      for (unsigned x = 0; x < fft_block_size; x++)
+      for (x = 0; x < fft_block_size; x++)
       {
          block_vertices[2 * (y * fft_block_size + x) + 0] = x;
          block_vertices[2 * (y * fft_block_size + x) + 1] = y;
@@ -637,8 +648,7 @@ void GLFFT::init_block()
    std::vector<GLuint> block_indices(block.elems);
    GLuint *bp = &block_indices[0];
 
-   int pos = 0;
-   for (int y = 0; y < int(fft_depth) - 1; y++)
+   for (y = 0; y < fft_depth - 1; y++)
    {
       int step_odd = -int(fft_block_size) + ((y & 1) ? -1 : 1);
       int step_even = fft_block_size;
@@ -731,7 +741,8 @@ void GLFFT::context_destroy()
    sliding.clear();
 }
 
-// GLFFT requires either GLES3 or desktop GL with ES3_compat (supported by MESA on Linux) extension.
+/* GLFFT requires either GLES3 or 
+ * desktop GL with ES3_compat (supported by MESA on Linux) extension. */
 glfft_t *glfft_new(unsigned fft_steps, rglgen_proc_address_t proc)
 {
 #ifdef HAVE_OPENGLES3
