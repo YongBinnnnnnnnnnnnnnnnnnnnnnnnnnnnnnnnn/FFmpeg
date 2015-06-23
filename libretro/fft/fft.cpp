@@ -241,8 +241,9 @@ static const char fragment_program_complex[] =
 
 GLuint GLFFT::compile_shader(GLenum type, const char *source)
 {
-   GLint status = 0;
+   GLint status  = 0;
    GLuint shader = glCreateShader(type);
+
    glShaderSource(shader, 1, (const GLchar**)&source, NULL);
    glCompileShader(shader);
    
@@ -265,9 +266,9 @@ GLuint GLFFT::compile_shader(GLenum type, const char *source)
 GLuint GLFFT::compile_program(const char *vertex_source, const char *fragment_source)
 {
    GLint status = 0;
-   GLuint prog = glCreateProgram();
-   GLuint vert = compile_shader(GL_VERTEX_SHADER, vertex_source);
-   GLuint frag = compile_shader(GL_FRAGMENT_SHADER, fragment_source);
+   GLuint prog  = glCreateProgram();
+   GLuint vert  = compile_shader(GL_VERTEX_SHADER, vertex_source);
+   GLuint frag  = compile_shader(GL_FRAGMENT_SHADER, fragment_source);
 
    glAttachShader(prog, vert);
    glAttachShader(prog, frag);
@@ -292,6 +293,8 @@ GLuint GLFFT::compile_program(const char *vertex_source, const char *fragment_so
 
 void GLFFT::render(GLuint backbuffer, unsigned width, unsigned height)
 {
+   mat4 mvp;
+
    // Render scene.
    glBindFramebuffer(GL_FRAMEBUFFER, ms_fbo ? ms_fbo : backbuffer);
    glViewport(0, 0, width, height);
@@ -299,7 +302,7 @@ void GLFFT::render(GLuint backbuffer, unsigned width, unsigned height)
    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
    vec3 eye(0, 80, -60);
-   mat4 mvp = perspective((float)M_HALF_PI, (float)width / height, 1.0f, 500.0f) *
+   mvp = perspective((float)M_HALF_PI, (float)width / height, 1.0f, 500.0f) *
       lookAt(eye, eye + vec3(0.0f, 0.0f, 1.0f), vec3(0.0f, 1.0f, 0.0f));
 
    glUseProgram(block.prog);
@@ -333,6 +336,8 @@ void GLFFT::render(GLuint backbuffer, unsigned width, unsigned height)
 void GLFFT::step_fft(const GLshort *audio_buffer, unsigned frames)
 {
    unsigned i;
+   GLshort *buffer;
+   GLshort *slide = &sliding[0];
 
    glEnable(GL_DEPTH_TEST);
    glEnable(GL_CULL_FACE);
@@ -345,14 +350,15 @@ void GLFFT::step_fft(const GLshort *audio_buffer, unsigned frames)
    glBindTexture(GL_TEXTURE_2D, input_tex);
    glUseProgram(prog_real);
 
-   GLshort *slide = &sliding[0];
    memmove(slide, slide + frames * 2, (sliding.size() - 2 * frames) * sizeof(GLshort));
    memcpy(slide + sliding.size() - frames * 2, audio_buffer, 2 * frames * sizeof(GLshort));
 
    // Upload audio data to GPU.
    glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pbo);
-   GLshort *buffer = static_cast<GLshort*>(glMapBufferRange(GL_PIXEL_UNPACK_BUFFER, 0,
+
+   buffer = static_cast<GLshort*>(glMapBufferRange(GL_PIXEL_UNPACK_BUFFER, 0,
             2 * fft_size * sizeof(GLshort), GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT));
+
    if (buffer)
    {
       memcpy(buffer, slide, sliding.size() * sizeof(GLshort));
@@ -449,22 +455,22 @@ void GLFFT::build_fft_params(GLuint *buffer, unsigned step, unsigned size)
    {
       for (j = i; j < i + step_size; j++)
       {
-         int s = j - i;
-         float phase = -1.0f * (float)s / step_size;
+         int s              = j - i;
+         float phase        = -1.0f * (float)s / step_size;
 
          float twiddle_real = cos(M_PI * phase);
          float twiddle_imag = sin(M_PI * phase);
 
-         unsigned a = j;
-         unsigned b = j + step_size;
+         unsigned a         = j;
+         unsigned b         = j + step_size;
 
-         unsigned read_a = (step == 0) ? bitinverse(a, size) : a;
-         unsigned read_b = (step == 0) ? bitinverse(b, size) : b;
+         unsigned read_a    = (step == 0) ? bitinverse(a, size) : a;
+         unsigned read_b    = (step == 0) ? bitinverse(b, size) : b;
 
-         buffer[2 * a + 0] = (read_a << 16) | read_b;
-         buffer[2 * a + 1] = packHalf2x16(vec2(twiddle_real, twiddle_imag));
-         buffer[2 * b + 0] = (read_a << 16) | read_b;
-         buffer[2 * b + 1] = packHalf2x16(-vec2(twiddle_real, twiddle_imag));
+         buffer[2 * a + 0]  = (read_a << 16) | read_b;
+         buffer[2 * a + 1]  = packHalf2x16(vec2(twiddle_real, twiddle_imag));
+         buffer[2 * b + 0]  = (read_a << 16) | read_b;
+         buffer[2 * b + 1]  = packHalf2x16(-vec2(twiddle_real, twiddle_imag));
       }
    }
 }
@@ -477,7 +483,8 @@ void GLFFT::init_quad_vao(void)
    };
    glGenBuffers(1, &quad);
    glBindBuffer(GL_ARRAY_BUFFER, quad);
-   glBufferData(GL_ARRAY_BUFFER, sizeof(quad_buffer), quad_buffer, GL_STATIC_DRAW);
+   glBufferData(GL_ARRAY_BUFFER,
+         sizeof(quad_buffer), quad_buffer, GL_STATIC_DRAW);
    glBindBuffer(GL_ARRAY_BUFFER, 0);
 
    glGenVertexArrays(1, &vao);
@@ -491,8 +498,8 @@ void GLFFT::init_quad_vao(void)
    glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
-// Modified Bessel function of first order.
-// Check Wiki for mathematical definition ...
+/* Modified Bessel function of first order.
+ * Check Wiki for mathematical definition ... */
 static inline double kaiser_besseli0(double x)
 {
    unsigned i;
@@ -504,16 +511,17 @@ static inline double kaiser_besseli0(double x)
    double two_div_pow = 1.0;
    double x_sqr = x * x;
 
-   // Approximate. This is an infinite sum.
-   // Luckily, it converges rather fast.
+   /* Approximate. This is an infinite sum.
+    * Luckily, it converges rather fast. */
    for (i = 0; i < 18; i++)
    {
-      sum += x_pow * two_div_pow / (factorial * factorial);
+      sum            += 
+         x_pow * two_div_pow / (factorial * factorial);
 
       factorial_mult += 1.0;
-      x_pow *= x_sqr;
-      two_div_pow *= 0.25;
-      factorial *= factorial_mult;
+      x_pow          *= x_sqr;
+      two_div_pow    *= 0.25;
+      factorial      *= factorial_mult;
    }
 
    return sum;
@@ -563,9 +571,12 @@ void GLFFT::init_target(Target &target, GLenum format,
    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
+#define KAISER_BETA 12.0
+
 void GLFFT::init_fft()
 {
    unsigned i;
+   double window_mod;
    static const GLfloat unity[] = { 0.0f, 0.0f, 1.0f, 1.0f };
 
    prog_real    = compile_program(vertex_program, fragment_program_real);
@@ -597,14 +608,15 @@ void GLFFT::init_fft()
 
    init_texture(window_tex, GL_R16UI, fft_size, 1);
    GL_CHECK_ERROR();
-#define KAISER_BETA 12.0
+
    std::vector<GLushort> window(fft_size);
-   double window_mod = 1.0 / kaiser_window(0.0, KAISER_BETA);
-   for (int i = 0; i < int(fft_size); i++)
+   window_mod = 1.0 / kaiser_window(0.0, KAISER_BETA);
+
+   for (i = 0; i < fft_size; i++)
    {
       double phase = (double)(i - int(fft_size) / 2) / (int(fft_size) / 2);
-      double w = kaiser_window(phase, KAISER_BETA);
-      window[i] = round(0xffff * w * window_mod);
+      double     w = kaiser_window(phase, KAISER_BETA);
+      window[i]    = round(0xffff * w * window_mod);
    }
    glBindTexture(GL_TEXTURE_2D, window_tex);
    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, fft_size, 1, GL_RED_INTEGER, GL_UNSIGNED_SHORT, &window[0]);
@@ -618,6 +630,7 @@ void GLFFT::init_fft()
          log2i(MAX(fft_size, fft_depth)) + 1, GL_NEAREST, GL_LINEAR_MIPMAP_LINEAR);
 
    GL_CHECK_ERROR();
+
    for (i = 0; i < fft_steps; i++)
    {
       init_target(passes[i].target, GL_RG32UI, fft_size, 1, 1);
@@ -642,7 +655,8 @@ void GLFFT::init_fft()
 void GLFFT::init_block()
 {
    unsigned x, y;
-   int pos = 0;
+   GLuint *bp;
+   int pos    = 0;
 
    block.prog = compile_program(vertex_program_heightmap, fragment_program_heightmap);
    glUseProgram(block.prog);
@@ -663,7 +677,8 @@ void GLFFT::init_block()
 
    block.elems = (2 * fft_block_size - 1) * (fft_depth - 1) + 1;
    std::vector<GLuint> block_indices(block.elems);
-   GLuint *bp = &block_indices[0];
+
+   bp = &block_indices[0];
 
    for (y = 0; y < fft_depth - 1; y++)
    {
@@ -704,8 +719,8 @@ void GLFFT::context_reset(unsigned fft_steps, rglgen_proc_address_t proc, unsign
 
    this->fft_steps = fft_steps;
    this->fft_depth = fft_depth;
-   fft_size = 1 << fft_steps;
-   fft_block_size = fft_size / 4 + 1;
+   fft_size        = 1 << fft_steps;
+   fft_block_size  = fft_size / 4 + 1;
 
    passes.resize(fft_steps);
    sliding.resize(2 * fft_size);
@@ -723,13 +738,13 @@ void GLFFT::init_multisample(unsigned width, unsigned height, unsigned samples)
 {
    if (ms_rb_color)
       glDeleteRenderbuffers(1, &ms_rb_color);
+   ms_rb_color = 0;
    if (ms_rb_ds)
       glDeleteRenderbuffers(1, &ms_rb_ds);
+   ms_rb_ds    = 0;
    if (ms_fbo)
       glDeleteFramebuffers(1, &ms_fbo);
-   ms_rb_color = 0;
-   ms_rb_ds = 0;
-   ms_fbo = 0;
+   ms_fbo      = 0;
 
    if (samples > 1)
    {
