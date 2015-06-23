@@ -30,6 +30,10 @@ using namespace glm;
 #define GL_CHECK_ERROR()
 #endif
 
+#ifndef MAX
+#define MAX(a, b) ((b > a) ? (b) : (a))
+#endif
+
 static const char vertex_program_heightmap[] =
    "#version 300 es\n"
    "layout(location = 0) in vec2 aVertex;\n"
@@ -598,7 +602,7 @@ void GLFFT::init_fft()
    init_texture(input_tex, GL_RG16I, fft_size, 1);
    init_target(output, GL_RG32UI, fft_size, fft_depth, 1);
    init_target(resolve, GL_RGBA8, fft_size, fft_depth, 1);
-   init_target(blur, GL_RGBA8, fft_size, fft_depth, log2i(max(fft_size, fft_depth)) + 1, GL_NEAREST, GL_LINEAR_MIPMAP_LINEAR);
+   init_target(blur, GL_RGBA8, fft_size, fft_depth, log2i(MAX(fft_size, fft_depth)) + 1, GL_NEAREST, GL_LINEAR_MIPMAP_LINEAR);
 
    GL_CHECK_ERROR();
    for (unsigned i = 0; i < fft_steps; i++)
