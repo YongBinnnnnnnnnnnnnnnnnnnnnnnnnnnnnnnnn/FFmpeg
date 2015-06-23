@@ -241,18 +241,19 @@ static const char fragment_program_complex[] =
 
 GLuint GLFFT::compile_shader(GLenum type, const char *source)
 {
+   GLint status = 0;
    GLuint shader = glCreateShader(type);
    glShaderSource(shader, 1, (const GLchar**)&source, NULL);
    glCompileShader(shader);
    
-   GLint status = 0;
    glGetShaderiv(shader, GL_COMPILE_STATUS, &status);
 
    if (!status)
    {
-      log_cb(RETRO_LOG_ERROR, "Failed to compile.\n");
       char log_info[8 * 1024];
       GLsizei log_len;
+
+      log_cb(RETRO_LOG_ERROR, "Failed to compile.\n");
       glGetShaderInfoLog(shader, sizeof(log_info), &log_len, log_info);
       log_cb(RETRO_LOG_ERROR, "ERROR: %s\n", log_info);
       return 0;
@@ -263,6 +264,7 @@ GLuint GLFFT::compile_shader(GLenum type, const char *source)
 
 GLuint GLFFT::compile_program(const char *vertex_source, const char *fragment_source)
 {
+   GLint status = 0;
    GLuint prog = glCreateProgram();
    GLuint vert = compile_shader(GL_VERTEX_SHADER, vertex_source);
    GLuint frag = compile_shader(GL_FRAGMENT_SHADER, fragment_source);
@@ -271,8 +273,8 @@ GLuint GLFFT::compile_program(const char *vertex_source, const char *fragment_so
    glAttachShader(prog, frag);
    glLinkProgram(prog);
 
-   GLint status = 0;
    glGetProgramiv(prog, GL_LINK_STATUS, &status);
+
    if (!status)
    {
       char log_info[8 * 1024];
@@ -522,7 +524,8 @@ static inline double kaiser_window(double index, double beta)
    return kaiser_besseli0(beta * sqrtf(1 - index * index));
 }
 
-void GLFFT::init_texture(GLuint &tex, GLenum format, unsigned width, unsigned height, unsigned levels, GLenum mag, GLenum min)
+void GLFFT::init_texture(GLuint &tex, GLenum format,
+      unsigned width, unsigned height, unsigned levels, GLenum mag, GLenum min)
 {
    glGenTextures(1, &tex);
    glBindTexture(GL_TEXTURE_2D, tex);
@@ -532,7 +535,8 @@ void GLFFT::init_texture(GLuint &tex, GLenum format, unsigned width, unsigned he
    glBindTexture(GL_TEXTURE_2D, 0);
 }
 
-void GLFFT::init_target(Target &target, GLenum format, unsigned width, unsigned height, unsigned levels, GLenum mag, GLenum min)
+void GLFFT::init_target(Target &target, GLenum format,
+      unsigned width, unsigned height, unsigned levels, GLenum mag, GLenum min)
 {
    init_texture(target.tex, format, width, height, levels, mag, min);
    glGenFramebuffers(1, target.fbo.addr());
@@ -561,6 +565,7 @@ void GLFFT::init_target(Target &target, GLenum format, unsigned width, unsigned 
 
 void GLFFT::init_fft()
 {
+   unsigned i;
    static const GLfloat unity[] = { 0.0f, 0.0f, 1.0f, 1.0f };
 
    prog_real    = compile_program(vertex_program, fragment_program_real);
@@ -609,10 +614,11 @@ void GLFFT::init_fft()
    init_texture(input_tex, GL_RG16I, fft_size, 1);
    init_target(output, GL_RG32UI, fft_size, fft_depth, 1);
    init_target(resolve, GL_RGBA8, fft_size, fft_depth, 1);
-   init_target(blur, GL_RGBA8, fft_size, fft_depth, log2i(MAX(fft_size, fft_depth)) + 1, GL_NEAREST, GL_LINEAR_MIPMAP_LINEAR);
+   init_target(blur, GL_RGBA8, fft_size, fft_depth,
+         log2i(MAX(fft_size, fft_depth)) + 1, GL_NEAREST, GL_LINEAR_MIPMAP_LINEAR);
 
    GL_CHECK_ERROR();
-   for (unsigned i = 0; i < fft_steps; i++)
+   for (i = 0; i < fft_steps; i++)
    {
       init_target(passes[i].target, GL_RG32UI, fft_size, 1, 1);
       init_texture(passes[i].parameter_tex, GL_RG32UI, fft_size, 1);
