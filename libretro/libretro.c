@@ -29,7 +29,7 @@
 
 #ifdef RARCH_INTERNAL
 #include "../libretro.h"
-#define CORE_PREFIX(s) CORE_PREFIX##s
+#define CORE_PREFIX(s) libretro_ffmpeg_##s
 #else
 #include "libretro.h"
 #define CORE_PREFIX(s) s
@@ -414,7 +414,7 @@ void CORE_PREFIX(retro_run)(void)
    if (fft_width != old_fft_width || fft_height != old_fft_height)
    {
       struct retro_system_av_info info;
-      retro_get_system_av_info(&info);
+      CORE_PREFIX(retro_get_system_av_info)(&info);
       if (!environ_cb(RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO, &info))
       {
          fft_width = old_fft_width;
@@ -1514,7 +1514,7 @@ bool CORE_PREFIX(retro_load_game)(const struct retro_game_info *info)
    return true;
 
 error:
-   retro_unload_game();
+   CORE_PREFIX(retro_unload_game)();
    return false;
 }
 
