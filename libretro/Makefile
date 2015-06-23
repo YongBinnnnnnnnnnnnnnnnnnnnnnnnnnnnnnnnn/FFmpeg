@@ -77,7 +77,7 @@ ifneq (,$(findstring unix,$(platform)))
    SHARED := -shared -Wl,--version-script=link.T -Wl,--no-undefined -fPIC
 ifeq ($(OPENGL),1)
    GL_LIB := -lGL
-   CFLAGS += -DHAVE_GL
+   CFLAGS += -DHAVE_OPENGL
    HAVE_GL := 1
 	HAVE_GL_FFT := 1
 endif
@@ -168,7 +168,7 @@ else ifneq (,$(findstring win,$(platform)))
    CFLAGS += -Iffmpeg
 ifeq ($(OPENGL),1)
    GL_LIB := -lopengl32
-   CFLAGS += -DHAVE_GL
+   CFLAGS += -DHAVE_OPENGL
    HAVE_GL := 1
 	HAVE_GL_FFT := 1
 	WIN32_PLATFORM := 1
@@ -237,7 +237,7 @@ endif
 LIBAVCODEC_SOURCE :=
 LIBAVFORMAT_SOURCE :=
 LIBAVUTIL_SOURCE :=
-LIBRETRO_SOURCE := libretro.c fifo_buffer.c thread.c glsym/rglgen.c
+LIBRETRO_SOURCE := libretro.c libretro-common/queues/fifo_buffer.c libretro-common/rthreads/rthreads.c libretro-common/glsym/rglgen.c
 DEPS_SOURCE :=
 
 ifeq ($(HAVE_BIGENDIAN),1)
@@ -2149,7 +2149,7 @@ endif
 ifeq ($(HAVE_GL), 1)
    ifeq ($(GLES), 1)
       LIBS += -lGLESv2
-      CFLAGS += -DGLES -DHAVE_OPENGLES2
+      CFLAGS += -DHAVE_OPENGLES -DHAVE_OPENGLES2
 		SOURCE += glsym/glsym_es2.c
    else
       LIBS += $(GL_LIB)
@@ -2162,6 +2162,8 @@ ifeq ($(HAVE_NEON),1)
 else
 	CFLAGS += -DHAVE_INTRINSICS_NEON=0
 endif
+
+CFLAGS += -Ilibretro-common/include 
 
 OBJECTS := $(DEPS_SOURCE:.c=.o) $(LIBRETRO_SOURCE:.c=.o) $(FFT_SOURCE:.cpp=.o) $(LIBAVUTIL_SOURCE:.c=.o) $(LIBAVFORMAT_SOURCE:.c=.o) $(LIBSWSCALE_SOURCE:.c=.o) $(LIBAVCODEC_SOURCE:.c=.o) $(LIBSWRESAMPLE_SOURCE:.c=.o)
 

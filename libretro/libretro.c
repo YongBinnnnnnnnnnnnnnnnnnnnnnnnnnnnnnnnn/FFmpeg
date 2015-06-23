@@ -1,7 +1,3 @@
-#include "libretro.h"
-#include "thread.h"
-#include "fifo_buffer.h"
-
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -24,8 +20,19 @@
 #include "fft/fft.h"
 #endif
 
-#ifdef HAVE_GL
-#include "glsym/glsym.h"
+#ifdef HAVE_OPENGL
+#include <glsym/glsym.h>
+#endif
+
+#include <rthreads/rthreads.h>
+#include <queues/fifo_buffer.h>
+
+#ifdef RARCH_INTERNAL
+#include "../libretro.h"
+#define CORE_PREFIX(s) CORE_PREFIX##s
+#else
+#include "libretro.h"
+#define CORE_PREFIX(s) s
 #endif
 
 static bool reset_triggered;
@@ -122,9 +129,9 @@ static double seek_time;
 // GL stuff
 struct frame
 {
-#if defined(HAVE_GL)
+#if defined(HAVE_OPENGL)
    GLuint tex;
-#if !defined(GLES)
+#if !defined(HAVE_OPENGLES)
    GLuint pbo;
 #endif
 #endif
@@ -133,7 +140,7 @@ struct frame
 
 static struct frame frames[2];
 
-#ifdef HAVE_GL
+#ifdef HAVE_OPENGL
 static bool temporal_interpolation;
 static bool use_gl;
 static struct retro_hw_render_callback hw_render;
@@ -177,7 +184,7 @@ static void append_attachment(const uint8_t *data, size_t size)
    attachments_size++;
 }
 
-void retro_init(void)
+void CORE_PREFIX(retro_init)(void)
 {
    reset_triggered = false;
 
@@ -185,30 +192,30 @@ void retro_init(void)
    //avdevice_register_all(); // FIXME: Occasionally crashes inside libavdevice for some odd reason on reentrancy. Likely a libavdevice bug.
 }
 
-void retro_deinit(void)
+void CORE_PREFIX(retro_deinit)(void)
 {}
 
-unsigned retro_api_version(void)
+unsigned CORE_PREFIX(retro_api_version)(void)
 {
    return RETRO_API_VERSION;
 }
 
-void retro_set_controller_port_device(unsigned port, unsigned device)
+void CORE_PREFIX(retro_set_controller_port_device)(unsigned port, unsigned device)
 {
    (void)port;
    (void)device;
 }
 
-void retro_get_system_info(struct retro_system_info *info)
+void CORE_PREFIX(retro_get_system_info)(struct retro_system_info *info)
 {
    memset(info, 0, sizeof(*info));
    info->library_name     = "FFmpeg";
    info->library_version  = "v1";
    info->need_fullpath    = true;
-   info->valid_extensions = "mkv|avi|f4v|f4f|3gp|ogm|flv|mp4|mp3|flac|ogg|m4a";
+   info->valid_extensions = "mkv|avi|f4v|f4f|3gp|ogm|flv|mp4|mov|mp3|wav|webm|wmv|flac|ogg|m4a";
 }
 
-void retro_get_system_av_info(struct retro_system_av_info *info)
+void CORE_PREFIX(retro_get_system_av_info)(struct retro_system_av_info *info)
 {
    info->timing = (struct retro_system_timing) {
       .fps = media.interpolate_fps,
@@ -237,12 +244,12 @@ void retro_get_system_av_info(struct retro_system_av_info *info)
    };
 }
 
-void retro_set_environment(retro_environment_t cb)
+void CORE_PREFIX(retro_set_environment)(retro_environment_t cb)
 {
    environ_cb = cb;
 
    static const struct retro_variable vars[] = {
-#ifdef HAVE_GL
+#ifdef HAVE_OPENGL
       { "ffmpeg_temporal_interp", "Temporal Interpolation; enabled|disabled" },
 #endif
 #ifdef HAVE_GL_FFT
@@ -262,39 +269,39 @@ void retro_set_environment(retro_environment_t cb)
       log_cb = fallback_log;
 }
 
-void retro_set_audio_sample(retro_audio_sample_t cb)
+void CORE_PREFIX(retro_set_audio_sample)(retro_audio_sample_t cb)
 {
    audio_cb = cb;
 }
 
-void retro_set_audio_sample_batch(retro_audio_sample_batch_t cb)
+void CORE_PREFIX(retro_set_audio_sample_batch)(retro_audio_sample_batch_t cb)
 {
    audio_batch_cb = cb;
 }
 
-void retro_set_input_poll(retro_input_poll_t cb)
+void CORE_PREFIX(retro_set_input_poll)(retro_input_poll_t cb)
 {
    input_poll_cb = cb;
 }
 
-void retro_set_input_state(retro_input_state_t cb)
+void CORE_PREFIX(retro_set_input_state)(retro_input_state_t cb)
 {
    input_state_cb = cb;
 }
 
-void retro_set_video_refresh(retro_video_refresh_t cb)
+void CORE_PREFIX(retro_set_video_refresh)(retro_video_refresh_t cb)
 {
    video_cb = cb;
 }
 
-void retro_reset(void)
+void CORE_PREFIX(retro_reset)(void)
 {
    reset_triggered = true;
 }
 
 static void check_variables(void)
 {
-#ifdef HAVE_GL
+#ifdef HAVE_OPENGL
    struct retro_variable var = {
       .key = "ffmpeg_temporal_interp"
    };
@@ -390,7 +397,7 @@ static void seek_frame(int seek_frames)
    slock_unlock(fifo_lock);
 }
 
-void retro_run(void)
+void CORE_PREFIX(retro_run)(void)
 {
    bool updated = false;
 
@@ -433,9 +440,11 @@ void retro_run(void)
    bool right = input_state_cb(0, RETRO_DEVICE_JOYPAD, 0,
          RETRO_DEVICE_ID_JOYPAD_RIGHT);
    bool up = input_state_cb(0, RETRO_DEVICE_JOYPAD, 0,
-         RETRO_DEVICE_ID_JOYPAD_UP);
+         RETRO_DEVICE_ID_JOYPAD_UP) ||
+      input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_WHEELUP);
    bool down = input_state_cb(0, RETRO_DEVICE_JOYPAD, 0,
-         RETRO_DEVICE_ID_JOYPAD_DOWN);
+         RETRO_DEVICE_ID_JOYPAD_DOWN) ||
+      input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_WHEELDOWN);
    bool l = input_state_cb(0, RETRO_DEVICE_JOYPAD, 0,
          RETRO_DEVICE_ID_JOYPAD_L);
    bool r = input_state_cb(0, RETRO_DEVICE_JOYPAD, 0,
@@ -569,10 +578,10 @@ void retro_run(void)
          if (!decode_thread_dead)
          {
             fifo_read(video_decode_fifo, &pts, sizeof(int64_t));
-#if defined(HAVE_GL)
+#if defined(HAVE_OPENGL)
             if (use_gl)
             {
-#if defined(GLES)
+#if defined(HAVE_OPENGLES)
                fifo_read(video_decode_fifo, video_frame_temp_buffer, media.width * media.height * sizeof(uint32_t));
                glBindTexture(GL_TEXTURE_2D, frames[1].tex);
                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA,
@@ -607,7 +616,7 @@ void retro_run(void)
          frames[1].pts = av_q2d(fctx->streams[video_stream]->time_base) * pts;
       }
 
-#ifdef HAVE_GL
+#ifdef HAVE_OPENGL
       if (use_gl)
       {
          float mix_factor = (min_pts - frames[0].pts) / (frames[1].pts - frames[0].pts);
@@ -729,6 +738,7 @@ static bool codec_id_is_ttf(enum AVCodecID id)
    }
 }
 
+#ifdef HAVE_SSA
 static bool codec_id_is_ass(enum AVCodecID id)
 {
    switch (id)
@@ -744,6 +754,7 @@ static bool codec_id_is_ass(enum AVCodecID id)
          return false;
    }
 }
+#endif
 
 static bool open_codecs(void)
 {
@@ -1225,7 +1236,7 @@ static void decode_thread(void *data)
    slock_unlock(fifo_lock);
 }
 
-#ifdef HAVE_GL
+#ifdef HAVE_OPENGL
 static void context_destroy(void)
 {
 #ifdef HAVE_GL_FFT
@@ -1269,7 +1280,7 @@ static void context_reset(void)
       "uniform sampler2D sTex0;\n"
       "uniform sampler2D sTex1;\n"
       "uniform float uMix;\n"
-#ifdef GLES
+#if defined(HAVE_OPENGLES)
       "void main() { gl_FragColor = vec4(pow(mix(pow(texture2D(sTex0, vTex).bgr, vec3(2.2)), pow(texture2D(sTex1, vTex).bgr, vec3(2.2)), uMix), vec3(1.0 / 2.2)), 1.0); }\n";
       // Get format as GL_RGBA/GL_UNSIGNED_BYTE. Assume little endian, so we get ARGB -> BGRA byte order, and we have to swizzle to .BGR.
 #else
@@ -1304,7 +1315,7 @@ static void context_reset(void)
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
-#ifndef GLES
+#if !defined(HAVE_OPENGLES)
       glGenBuffers(1, &frames[i].pbo);
       glBindBuffer(GL_PIXEL_UNPACK_BUFFER, frames[i].pbo);
       glBufferData(GL_PIXEL_UNPACK_BUFFER, media.width * media.height * sizeof(uint32_t), NULL, GL_STREAM_DRAW);
@@ -1328,96 +1339,7 @@ static void context_reset(void)
 }
 #endif
 
-bool retro_load_game(const struct retro_game_info *info)
-{
-   struct retro_input_descriptor desc[] = {
-      { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_LEFT,  "Seek -10 seconds" },
-      { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP,    "Seek +60 seconds" },
-      { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_DOWN,  "Seek -60 seconds" },
-      { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT, "Seek +10 seconds" },
-      { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L,     "Cycle Audio Track" },
-      { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R, "Cycle Subtitle Track" },
-
-      { 0 },
-   };
-
-   environ_cb(RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS, desc);
-
-   enum retro_pixel_format fmt = RETRO_PIXEL_FORMAT_XRGB8888;
-   if (!environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &fmt))
-      LOG_ERR_GOTO("Cannot set pixel format.", error);
-
-   if (avformat_open_input(&fctx, info->path, NULL, NULL) < 0)
-      LOG_ERR_GOTO("Failed to open input.", error);
-
-   if (avformat_find_stream_info(fctx, NULL) < 0)
-      LOG_ERR_GOTO("Failed to find stream info.", error);
-
-   av_dump_format(fctx, 0, info->path, 0);
-
-   if (!open_codecs())
-      LOG_ERR_GOTO("Failed to find codec.", error);
-
-   if (!init_media_info())
-      LOG_ERR_GOTO("Failed to init media info.", error);
-
-   decode_thread_dead = false;
-
-   bool is_glfft = false;
-#ifdef HAVE_GL_FFT
-   is_glfft = video_stream < 0 && audio_streams_num > 0;
-#endif
-
-   if (video_stream >= 0 || is_glfft)
-   {
-      video_decode_fifo = fifo_new(media.width * media.height * sizeof(uint32_t) * 32);
-
-#ifdef HAVE_GL
-      use_gl = true;
-      hw_render.context_reset = context_reset;
-      hw_render.context_destroy = context_destroy;
-      hw_render.bottom_left_origin = is_glfft;
-      hw_render.depth = is_glfft;
-      hw_render.stencil = is_glfft;
-#ifdef GLES
-      hw_render.context_type = RETRO_HW_CONTEXT_OPENGLES2;
-#else
-      hw_render.context_type = RETRO_HW_CONTEXT_OPENGL;
-#endif
-      if (!environ_cb(RETRO_ENVIRONMENT_SET_HW_RENDER, &hw_render))
-      {
-         use_gl=false;
-         LOG_ERR("Cannot initialize HW render.");
-      }
-#endif
-   }
-   if (audio_streams_num > 0)
-   {
-      unsigned buffer_seconds = video_stream >= 0 ? 20 : 1;
-      audio_decode_fifo = fifo_new(buffer_seconds * media.sample_rate * sizeof(int16_t) * 2);
-   }
-
-   fifo_cond = scond_new();
-   fifo_decode_cond = scond_new();
-   fifo_lock = slock_new();
-   decode_thread_lock = slock_new();
-
-   check_variables();
-
-   decode_thread_handle = sthread_create(decode_thread, NULL);
-
-   video_frame_temp_buffer = av_malloc(media.width * media.height * sizeof(uint32_t));
-
-   pts_bias = 0.0;
-
-   return true;
-
-error:
-   retro_unload_game();
-   return false;
-}
-
-void retro_unload_game(void)
+void CORE_PREFIX(retro_unload_game)(void)
 {
    if (decode_thread_handle)
    {
@@ -1507,12 +1429,102 @@ void retro_unload_game(void)
    av_freep(&video_frame_temp_buffer);
 }
 
-unsigned retro_get_region(void)
+bool CORE_PREFIX(retro_load_game)(const struct retro_game_info *info)
+{
+   struct retro_input_descriptor desc[] = {
+      { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_LEFT,  "Seek -10 seconds" },
+      { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP,    "Seek +60 seconds" },
+      { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_DOWN,  "Seek -60 seconds" },
+      { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT, "Seek +10 seconds" },
+      { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L,     "Cycle Audio Track" },
+      { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R, "Cycle Subtitle Track" },
+
+      { 0 },
+   };
+
+   environ_cb(RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS, desc);
+
+   enum retro_pixel_format fmt = RETRO_PIXEL_FORMAT_XRGB8888;
+   if (!environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &fmt))
+      LOG_ERR_GOTO("Cannot set pixel format.", error);
+
+   if (avformat_open_input(&fctx, info->path, NULL, NULL) < 0)
+      LOG_ERR_GOTO("Failed to open input.", error);
+
+   if (avformat_find_stream_info(fctx, NULL) < 0)
+      LOG_ERR_GOTO("Failed to find stream info.", error);
+
+   av_dump_format(fctx, 0, info->path, 0);
+
+   if (!open_codecs())
+      LOG_ERR_GOTO("Failed to find codec.", error);
+
+   if (!init_media_info())
+      LOG_ERR_GOTO("Failed to init media info.", error);
+
+   decode_thread_dead = false;
+
+   bool is_glfft = false;
+#ifdef HAVE_GL_FFT
+   is_glfft = video_stream < 0 && audio_streams_num > 0;
+#endif
+
+   if (video_stream >= 0 || is_glfft)
+   {
+      video_decode_fifo = fifo_new(media.width * media.height * sizeof(uint32_t) * 32);
+
+#ifdef HAVE_OPENGL
+      use_gl = true;
+      hw_render.context_reset = context_reset;
+      hw_render.context_destroy = context_destroy;
+      hw_render.bottom_left_origin = is_glfft;
+      hw_render.depth = is_glfft;
+      hw_render.stencil = is_glfft;
+#if defined(HAVE_OPENGLES)
+      hw_render.context_type = RETRO_HW_CONTEXT_OPENGLES2;
+#else
+      hw_render.context_type = RETRO_HW_CONTEXT_OPENGL;
+#endif
+      if (!environ_cb(RETRO_ENVIRONMENT_SET_HW_RENDER, &hw_render))
+      {
+         use_gl=false;
+         LOG_ERR("Cannot initialize HW render.");
+      }
+#endif
+   }
+   if (audio_streams_num > 0)
+   {
+      unsigned buffer_seconds = video_stream >= 0 ? 20 : 1;
+      audio_decode_fifo = fifo_new(buffer_seconds * media.sample_rate * sizeof(int16_t) * 2);
+   }
+
+   fifo_cond = scond_new();
+   fifo_decode_cond = scond_new();
+   fifo_lock = slock_new();
+   decode_thread_lock = slock_new();
+
+   check_variables();
+
+   decode_thread_handle = sthread_create(decode_thread, NULL);
+
+   video_frame_temp_buffer = av_malloc(media.width * media.height * sizeof(uint32_t));
+
+   pts_bias = 0.0;
+
+   return true;
+
+error:
+   retro_unload_game();
+   return false;
+}
+
+
+unsigned CORE_PREFIX(retro_get_region)(void)
 {
    return RETRO_REGION_NTSC;
 }
 
-bool retro_load_game_special(unsigned type, const struct retro_game_info *info, size_t num)
+bool CORE_PREFIX(retro_load_game_special)(unsigned type, const struct retro_game_info *info, size_t num)
 {
    (void)type;
    (void)info;
@@ -1520,41 +1532,41 @@ bool retro_load_game_special(unsigned type, const struct retro_game_info *info, 
    return false;
 }
 
-size_t retro_serialize_size(void)
+size_t CORE_PREFIX(retro_serialize_size)(void)
 {
    return 0;
 }
 
-bool retro_serialize(void *data, size_t size)
+bool CORE_PREFIX(retro_serialize)(void *data, size_t size)
 {
    (void)data;
    (void)size;
    return false;
 }
 
-bool retro_unserialize(const void *data, size_t size)
+bool CORE_PREFIX(retro_unserialize)(const void *data, size_t size)
 {
    (void)data;
    (void)size;
    return false;
 }
 
-void *retro_get_memory_data(unsigned id)
+void *CORE_PREFIX(retro_get_memory_data)(unsigned id)
 {
    (void)id;
    return NULL;
 }
 
-size_t retro_get_memory_size(unsigned id)
+size_t CORE_PREFIX(retro_get_memory_size)(unsigned id)
 {
    (void)id;
    return 0;
 }
 
-void retro_cheat_reset(void)
+void CORE_PREFIX(retro_cheat_reset)(void)
 {}
 
-void retro_cheat_set(unsigned index, bool enabled, const char *code)
+void CORE_PREFIX(retro_cheat_set)(unsigned index, bool enabled, const char *code)
 {
    (void)index;
    (void)enabled;
