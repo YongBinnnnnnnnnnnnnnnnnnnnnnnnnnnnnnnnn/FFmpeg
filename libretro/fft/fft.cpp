@@ -14,7 +14,6 @@ extern retro_log_printf_t log_cb;
 #include "glm/glm.hpp"
 #include "glm/gtc/matrix_transform.hpp"
 #include "glm/gtc/type_ptr.hpp"
-#include "glm/gtc/constants.hpp"
 using namespace glm;
 
 #define GL_DEBUG 0
