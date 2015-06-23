@@ -34,6 +34,14 @@ using namespace glm;
 #define MAX(a, b) ((b > a) ? (b) : (a))
 #endif
 
+#ifndef M_HALF_PI
+#define M_HALF_PI 1.57079632679489661923132169163975144
+#endif
+
+#ifndef M_PI
+#define M_PI      3.14159265359
+#endif
+
 static const char vertex_program_heightmap[] =
    "#version 300 es\n"
    "layout(location = 0) in vec2 aVertex;\n"
@@ -290,14 +298,14 @@ void GLFFT::render(GLuint backbuffer, unsigned width, unsigned height)
    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
    vec3 eye(0, 80, -60);
-   mat4 mvp = perspective(half_pi<float>(), (float)width / height, 1.0f, 500.0f) *
+   mat4 mvp = perspective((float)M_HALF_PI, (float)width / height, 1.0f, 500.0f) *
       lookAt(eye, eye + vec3(0.0f, 0.0f, 1.0f), vec3(0.0f, 1.0f, 0.0f));
 
    glUseProgram(block.prog);
    glUniformMatrix4fv(glGetUniformLocation(block.prog, "uMVP"), 1, GL_FALSE, value_ptr(mvp));
    glUniform2i(glGetUniformLocation(block.prog, "uOffset"), (-int(fft_block_size) + 1) / 2, output_ptr);
    glUniform4f(glGetUniformLocation(block.prog, "uHeightmapParams"), -(fft_block_size - 1.0f) / 2.0f, 0.0f, 3.0f, 2.0f);
-   glUniform1f(glGetUniformLocation(block.prog, "uAngleScale"), pi<float>() / ((fft_block_size - 1) / 2));
+   glUniform1f(glGetUniformLocation(block.prog, "uAngleScale"), M_PI / ((fft_block_size - 1) / 2));
 
    glBindVertexArray(block.vao);
    glBindTexture(GL_TEXTURE_2D, blur.tex);
@@ -556,10 +564,10 @@ void GLFFT::init_fft()
 {
    static const GLfloat unity[] = { 0.0f, 0.0f, 1.0f, 1.0f };
 
-   prog_real = compile_program(vertex_program, fragment_program_real);
+   prog_real    = compile_program(vertex_program, fragment_program_real);
    prog_complex = compile_program(vertex_program, fragment_program_complex);
    prog_resolve = compile_program(vertex_program, fragment_program_resolve);
-   prog_blur = compile_program(vertex_program, fragment_program_blur);
+   prog_blur    = compile_program(vertex_program, fragment_program_blur);
    GL_CHECK_ERROR();
 
    glUseProgram(prog_real);
@@ -654,9 +662,11 @@ void GLFFT::init_block()
 
    for (y = 0; y < fft_depth - 1; y++)
    {
+      int x;
       int step_odd = -int(fft_block_size) + ((y & 1) ? -1 : 1);
       int step_even = fft_block_size;
-      for (int x = 0; x < 2 * int(fft_block_size) - 1; x++)
+
+      for (x = 0; x < 2 * int(fft_block_size) - 1; x++)
       {
          *bp++ = pos;
          pos += (x & 1) ? step_odd : step_even;
