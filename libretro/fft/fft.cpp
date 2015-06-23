@@ -475,12 +475,12 @@ void GLFFT::init_quad_vao(void)
       -1, -1, 1, -1, -1, 1, 1, 1,
        0,  0, 1,  0,  0, 1, 1, 1,
    };
-   glGenBuffers(1, quad.addr());
+   glGenBuffers(1, &quad);
    glBindBuffer(GL_ARRAY_BUFFER, quad);
    glBufferData(GL_ARRAY_BUFFER, sizeof(quad_buffer), quad_buffer, GL_STATIC_DRAW);
    glBindBuffer(GL_ARRAY_BUFFER, 0);
 
-   glGenVertexArrays(1, vao.addr());
+   glGenVertexArrays(1, &vao);
    glBindVertexArray(vao);
    glBindBuffer(GL_ARRAY_BUFFER, quad);
    glEnableVertexAttribArray(0);
@@ -539,7 +539,7 @@ void GLFFT::init_target(Target &target, GLenum format,
       unsigned width, unsigned height, unsigned levels, GLenum mag, GLenum min)
 {
    init_texture(target.tex, format, width, height, levels, mag, min);
-   glGenFramebuffers(1, target.fbo.addr());
+   glGenFramebuffers(1, &target.fbo);
    glBindFramebuffer(GL_FRAMEBUFFER, target.fbo);
 
    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
@@ -633,7 +633,7 @@ void GLFFT::init_fft()
    }
 
    GL_CHECK_ERROR();
-   glGenBuffers(1, pbo.addr());
+   glGenBuffers(1, &pbo);
    glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pbo);
    glBufferData(GL_PIXEL_UNPACK_BUFFER, fft_size * 2 * sizeof(GLshort), 0, GL_DYNAMIC_DRAW);
    glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
@@ -722,20 +722,20 @@ void GLFFT::context_reset(unsigned fft_steps, rglgen_proc_address_t proc, unsign
 void GLFFT::init_multisample(unsigned width, unsigned height, unsigned samples)
 {
    if (ms_rb_color)
-      glDeleteRenderbuffers(1, ms_rb_color.addr());
+      glDeleteRenderbuffers(1, &ms_rb_color);
    if (ms_rb_ds)
-      glDeleteRenderbuffers(1, ms_rb_ds.addr());
+      glDeleteRenderbuffers(1, &ms_rb_ds);
    if (ms_fbo)
-      glDeleteFramebuffers(1, ms_fbo.addr());
+      glDeleteFramebuffers(1, &ms_fbo);
    ms_rb_color = 0;
    ms_rb_ds = 0;
    ms_fbo = 0;
 
    if (samples > 1)
    {
-      glGenRenderbuffers(1, ms_rb_color.addr());
-      glGenRenderbuffers(1, ms_rb_ds.addr());
-      glGenFramebuffers(1, ms_fbo.addr());
+      glGenRenderbuffers(1, &ms_rb_color);
+      glGenRenderbuffers(1, &ms_rb_ds);
+      glGenFramebuffers (1, &ms_fbo);
 
       glBindRenderbuffer(GL_RENDERBUFFER, ms_rb_color);
       glRenderbufferStorageMultisample(GL_RENDERBUFFER, samples, GL_RGBA8, width, height);

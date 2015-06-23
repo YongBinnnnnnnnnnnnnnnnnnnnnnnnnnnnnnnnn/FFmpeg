@@ -19,44 +19,33 @@ struct GLFFT
       void render(GLuint backbuffer, unsigned width, unsigned height);
 
    private:
-      class GLResource
-      {
-         public:
-            GLResource() : id(0) {}
-            operator GLuint& () { return id; }
-            GLResource& operator=(GLuint id) { this->id = id; return *this; }
-            GLuint* addr() { return &id; }
-            operator bool() const { return id != 0; }
-         private:
-            GLuint id;
-      };
 
       struct Target
       {
-         GLResource tex;
-         GLResource fbo;
+         GLuint tex;
+         GLuint fbo;
       };
 
       struct Pass
       {
          Target target;
-         GLResource parameter_tex;
+         GLuint parameter_tex;
       };
 
-      GLResource ms_rb_color;
-      GLResource ms_rb_ds;
-      GLResource ms_fbo;
+      GLuint ms_rb_color;
+      GLuint ms_rb_ds;
+      GLuint ms_fbo;
 
       std::vector<Pass> passes;
-      GLResource input_tex;
-      GLResource window_tex;
-      GLResource prog_real;
-      GLResource prog_complex;
-      GLResource prog_resolve;
-      GLResource prog_blur;
+      GLuint input_tex;
+      GLuint window_tex;
+      GLuint prog_real;
+      GLuint prog_complex;
+      GLuint prog_resolve;
+      GLuint prog_blur;
 
-      GLResource quad;
-      GLResource vao;
+      GLuint quad;
+      GLuint vao;
 
       unsigned output_ptr;
 
@@ -72,7 +61,7 @@ struct GLFFT
          unsigned elems;
       } block;
 
-      GLResource pbo;
+      GLuint pbo;
       std::vector<GLshort> sliding;
 
       unsigned fft_steps;
