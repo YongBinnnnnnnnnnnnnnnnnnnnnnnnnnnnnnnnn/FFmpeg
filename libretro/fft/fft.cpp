@@ -410,7 +410,7 @@ static void fft_step(glfft_t *fft, const GLshort *audio_buffer, unsigned frames)
    // Upload audio data to GPU.
    glBindBuffer(GL_PIXEL_UNPACK_BUFFER, fft->pbo);
 
-   buffer = static_cast<GLshort*>(glMapBufferRange(GL_PIXEL_UNPACK_BUFFER, 0,
+   buffer = (GLshort*)(glMapBufferRange(GL_PIXEL_UNPACK_BUFFER, 0,
             2 * fft->size * sizeof(GLshort), GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT));
 
    if (buffer)
