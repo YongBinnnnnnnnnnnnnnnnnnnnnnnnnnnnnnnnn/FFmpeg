@@ -4,13 +4,13 @@
 #include "../glsym/glsym.h"
 
 #ifdef __cplusplus
-#include "fft.hpp"
 extern "C" {
 #endif
 
-typedef struct GLFFT glfft_t;
+typedef struct glfft glfft_t;
 
 glfft_t *glfft_new(unsigned fft_steps, rglgen_proc_address_t proc);
+
 void glfft_free(glfft_t *fft);
 
 void glfft_init_multisample(glfft_t *fft, unsigned width, unsigned height, unsigned samples);
