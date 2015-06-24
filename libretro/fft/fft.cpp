@@ -345,7 +345,7 @@ static GLuint fft_compile_program(glfft_t *fft,
    return prog;
 }
 
-void fft_render(glfft_t *fft, GLuint backbuffer, unsigned width, unsigned height)
+static void fft_render(glfft_t *fft, GLuint backbuffer, unsigned width, unsigned height)
 {
    mat4 mvp;
 
@@ -387,7 +387,7 @@ void fft_render(glfft_t *fft, GLuint backbuffer, unsigned width, unsigned height
    GL_CHECK_ERROR();
 }
 
-void fft_step(glfft_t *fft, const GLshort *audio_buffer, unsigned frames)
+static void fft_step(glfft_t *fft, const GLshort *audio_buffer, unsigned frames)
 {
    unsigned i;
    GLshort *buffer;
