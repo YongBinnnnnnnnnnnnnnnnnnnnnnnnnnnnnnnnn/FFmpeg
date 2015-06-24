@@ -8,6 +8,38 @@
 #include "../glsym/glsym.h"
 #include "../libretro.h"
 
+#define GLM_SWIZZLE
+#define GLM_FORCE_RADIANS
+#include "glm/glm.hpp"
+#include "glm/gtc/matrix_transform.hpp"
+#include "glm/gtc/type_ptr.hpp"
+using namespace glm;
+
+#define GL_DEBUG 0
+#if GL_DEBUG
+#define GL_CHECK_ERROR() do { \
+   if (glGetError() != GL_NO_ERROR) \
+   { \
+      log_cb(RETRO_LOG_ERROR, "GL error at line: %d\n", __LINE__); \
+      abort(); \
+   } \
+} while(0)
+#else
+#define GL_CHECK_ERROR()
+#endif
+
+#ifndef MAX
+#define MAX(a, b) ((b > a) ? (b) : (a))
+#endif
+
+#ifndef M_HALF_PI
+#define M_HALF_PI 1.57079632679489661923132169163975144
+#endif
+
+#ifndef M_PI
+#define M_PI      3.14159265359
+#endif
+
 extern retro_log_printf_t log_cb;
 
 typedef struct target
@@ -61,38 +93,6 @@ typedef struct GLFFT
    unsigned fft_block_size;
    unsigned fft_depth;
 } glfft_t;
-
-#define GLM_SWIZZLE
-#define GLM_FORCE_RADIANS
-#include "glm/glm.hpp"
-#include "glm/gtc/matrix_transform.hpp"
-#include "glm/gtc/type_ptr.hpp"
-using namespace glm;
-
-#define GL_DEBUG 0
-#if GL_DEBUG
-#define GL_CHECK_ERROR() do { \
-   if (glGetError() != GL_NO_ERROR) \
-   { \
-      log_cb(RETRO_LOG_ERROR, "GL error at line: %d\n", __LINE__); \
-      abort(); \
-   } \
-} while(0)
-#else
-#define GL_CHECK_ERROR()
-#endif
-
-#ifndef MAX
-#define MAX(a, b) ((b > a) ? (b) : (a))
-#endif
-
-#ifndef M_HALF_PI
-#define M_HALF_PI 1.57079632679489661923132169163975144
-#endif
-
-#ifndef M_PI
-#define M_PI      3.14159265359
-#endif
 
 static const char vertex_program_heightmap[] =
    "#version 300 es\n"
