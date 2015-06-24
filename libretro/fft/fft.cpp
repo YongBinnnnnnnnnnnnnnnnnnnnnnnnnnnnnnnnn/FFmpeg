@@ -2,10 +2,9 @@
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
-#include <new>
 #include <vector>
 
-#include "../glsym/glsym.h"
+#include <glsym/glsym.h>
 #include "../libretro.h"
 
 #define GLM_SWIZZLE
