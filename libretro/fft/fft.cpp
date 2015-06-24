@@ -520,11 +520,12 @@ void fft_build_params(glfft_t *fft, GLuint *buffer, unsigned step, unsigned size
 
          unsigned read_a    = (step == 0) ? bitinverse(a, size) : a;
          unsigned read_b    = (step == 0) ? bitinverse(b, size) : b;
+         vec2 tmp           = vec2(twiddle_real, twiddle_imag);
 
          buffer[2 * a + 0]  = (read_a << 16) | read_b;
-         buffer[2 * a + 1]  = packHalf2x16(vec2(twiddle_real, twiddle_imag));
+         buffer[2 * a + 1]  = packHalf2x16(tmp);
          buffer[2 * b + 0]  = (read_a << 16) | read_b;
-         buffer[2 * b + 1]  = packHalf2x16(-vec2(twiddle_real, twiddle_imag));
+         buffer[2 * b + 1]  = packHalf2x16(-tmp);
       }
    }
 }
