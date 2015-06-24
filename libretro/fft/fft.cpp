@@ -2,7 +2,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
-#include <vector>
 
 #include <glsym/glsym.h>
 #include "../libretro.h"
@@ -632,6 +631,7 @@ static void fft_init(glfft_t *fft)
 {
    unsigned i;
    double window_mod;
+   GLushort *window;
    static const GLfloat unity[] = { 0.0f, 0.0f, 1.0f, 1.0f };
 
    fft->prog_real    = fft_compile_program(fft, vertex_program, fragment_program_real);
@@ -664,7 +664,8 @@ static void fft_init(glfft_t *fft)
    fft_init_texture(fft, &fft->window_tex, GL_R16UI, fft->size, 1, 1, GL_NEAREST, GL_NEAREST);
    GL_CHECK_ERROR();
 
-   std::vector<GLushort> window(fft->size);
+   window = (GLushort*)calloc(fft->size, sizeof(GLushort));
+
    window_mod = 1.0 / kaiser_window(0.0, KAISER_BETA);
 
    for (i = 0; i < fft->size; i++)
@@ -688,16 +689,20 @@ static void fft_init(glfft_t *fft)
 
    for (i = 0; i < fft->steps; i++)
    {
+      GLuint *param_buffer = NULL;
       fft_init_target(fft, &fft->passes[i].target, GL_RG32UI, fft->size, 1, 1, GL_NEAREST, GL_NEAREST);
       fft_init_texture(fft, &fft->passes[i].parameter_tex, GL_RG32UI, fft->size, 1, 1, GL_NEAREST, GL_NEAREST);
 
-      std::vector<GLuint> param_buffer(2 * fft->size);
+      param_buffer = (GLuint*)calloc(2 * fft->size, sizeof(GLuint));
+
       fft_build_params(fft, &param_buffer[0], i, fft->size);
 
       glBindTexture(GL_TEXTURE_2D, fft->passes[i].parameter_tex);
       glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0,
             fft->size, 1, GL_RG_INTEGER, GL_UNSIGNED_INT, &param_buffer[0]);
       glBindTexture(GL_TEXTURE_2D, 0);
+
+      free(param_buffer);
    }
 
    GL_CHECK_ERROR();
@@ -705,19 +710,27 @@ static void fft_init(glfft_t *fft)
    glBindBuffer(GL_PIXEL_UNPACK_BUFFER, fft->pbo);
    glBufferData(GL_PIXEL_UNPACK_BUFFER, fft->size * 2 * sizeof(GLshort), 0, GL_DYNAMIC_DRAW);
    glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+
+   free(window);
 }
 
 static void fft_init_block(glfft_t *fft)
 {
    unsigned x, y;
    GLuint *bp;
+   GLushort *block_vertices;
+   GLuint   *block_indices;
+   unsigned block_vertices_size;
+   unsigned block_indices_size;
    int pos    = 0;
 
    fft->block.prog = fft_compile_program(fft, vertex_program_heightmap, fragment_program_heightmap);
    glUseProgram(fft->block.prog);
    glUniform1i(glGetUniformLocation(fft->block.prog, "sHeight"), 0);
 
-   std::vector<GLushort> block_vertices(2 * fft->block_size * fft->depth);
+   block_vertices_size = 2 * fft->block_size * fft->depth;
+   block_vertices      = (GLushort*)calloc(block_vertices_size, sizeof(GLushort));
+
    for (y = 0; y < fft->depth; y++)
    {
       for (x = 0; x < fft->block_size; x++)
@@ -728,10 +741,12 @@ static void fft_init_block(glfft_t *fft)
    }
    glGenBuffers(1, &fft->block.vbo);
    glBindBuffer(GL_ARRAY_BUFFER, fft->block.vbo);
-   glBufferData(GL_ARRAY_BUFFER, block_vertices.size() * sizeof(GLushort), &block_vertices[0], GL_STATIC_DRAW);
+   glBufferData(GL_ARRAY_BUFFER, block_vertices_size * sizeof(GLushort), &block_vertices[0], GL_STATIC_DRAW);
 
    fft->block.elems = (2 * fft->block_size - 1) * (fft->depth - 1) + 1;
-   std::vector<GLuint> block_indices(fft->block.elems);
+
+   block_indices_size = fft->block.elems;
+   block_indices = (GLuint*)calloc(block_indices_size, sizeof(GLuint));
 
    bp = &block_indices[0];
 
@@ -754,7 +769,7 @@ static void fft_init_block(glfft_t *fft)
 
    glGenBuffers(1, &fft->block.ibo);
    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, fft->block.ibo);
-   glBufferData(GL_ELEMENT_ARRAY_BUFFER, block_indices.size() * sizeof(GLuint), &block_indices[0], GL_STATIC_DRAW);
+   glBufferData(GL_ELEMENT_ARRAY_BUFFER, block_indices_size * sizeof(GLuint), &block_indices[0], GL_STATIC_DRAW);
 
    glEnableVertexAttribArray(0);
    glVertexAttribPointer(0, 2, GL_UNSIGNED_SHORT, GL_FALSE, 0, 0);
@@ -762,6 +777,9 @@ static void fft_init_block(glfft_t *fft)
 
    glBindBuffer(GL_ARRAY_BUFFER, 0);
    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+
+   free(block_vertices);
+   free(block_indices);
 }
 
 static bool fft_context_reset(glfft_t *fft, unsigned fft_steps,
