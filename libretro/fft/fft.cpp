@@ -59,7 +59,9 @@ typedef struct GLFFT
    GLuint ms_rb_ds;
    GLuint ms_fbo;
 
-   std::vector<Pass> passes;
+   Pass *passes;
+   unsigned passes_size;
+
    GLuint input_tex;
    GLuint window_tex;
    GLuint prog_real;
@@ -84,7 +86,8 @@ typedef struct GLFFT
    } block;
 
    GLuint pbo;
-   std::vector<GLshort> sliding;
+   GLshort *sliding;
+   unsigned sliding_size;
 
    unsigned steps;
    unsigned size;
@@ -389,7 +392,7 @@ static void fft_step(glfft_t *fft, const GLshort *audio_buffer, unsigned frames)
 {
    unsigned i;
    GLshort *buffer;
-   GLshort *slide = &fft->sliding[0];
+   GLshort *slide = (GLshort*)&fft->sliding[0];
 
    glEnable(GL_DEPTH_TEST);
    glEnable(GL_CULL_FACE);
@@ -402,8 +405,8 @@ static void fft_step(glfft_t *fft, const GLshort *audio_buffer, unsigned frames)
    glBindTexture(GL_TEXTURE_2D, fft->input_tex);
    glUseProgram(fft->prog_real);
 
-   memmove(slide, slide + frames * 2, (fft->sliding.size() - 2 * frames) * sizeof(GLshort));
-   memcpy(slide + fft->sliding.size() - frames * 2, audio_buffer, 2 * frames * sizeof(GLshort));
+   memmove(slide, slide + frames * 2, (fft->sliding_size - 2 * frames) * sizeof(GLshort));
+   memcpy(slide + fft->sliding_size - frames * 2, audio_buffer, 2 * frames * sizeof(GLshort));
 
    // Upload audio data to GPU.
    glBindBuffer(GL_PIXEL_UNPACK_BUFFER, fft->pbo);
@@ -413,7 +416,7 @@ static void fft_step(glfft_t *fft, const GLshort *audio_buffer, unsigned frames)
 
    if (buffer)
    {
-      memcpy(buffer, slide, fft->sliding.size() * sizeof(GLshort));
+      memcpy(buffer, slide, fft->sliding_size * sizeof(GLshort));
       glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
    }
    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, fft->size, 1, GL_RG_INTEGER, GL_SHORT, NULL);
@@ -761,7 +764,7 @@ static void fft_init_block(glfft_t *fft)
    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 }
 
-static void fft_context_reset(glfft_t *fft, unsigned fft_steps,
+static bool fft_context_reset(glfft_t *fft, unsigned fft_steps,
       rglgen_proc_address_t proc, unsigned fft_depth)
 {
    rglgen_resolve_symbols(proc);
@@ -771,8 +774,17 @@ static void fft_context_reset(glfft_t *fft, unsigned fft_steps,
    fft->size        = 1 << fft_steps;
    fft->block_size  = fft->size / 4 + 1;
 
-   fft->passes.resize(fft_steps);
-   fft->sliding.resize(2 * fft->size);
+   fft->passes_size = fft_steps;
+   fft->passes = (Pass*)calloc(fft->passes_size, sizeof(Pass));
+
+   if (!fft->passes)
+      return false;
+
+   fft->sliding_size = 2 * fft->size;
+   fft->sliding = (GLshort*)calloc(fft->sliding_size, sizeof(GLshort));
+
+   if (!fft->sliding)
+      return false;
 
    GL_CHECK_ERROR();
    fft_init_quad_vao(fft);
@@ -781,6 +793,8 @@ static void fft_context_reset(glfft_t *fft, unsigned fft_steps,
    GL_CHECK_ERROR();
    fft_init_block(fft);
    GL_CHECK_ERROR();
+
+   return true;
 }
 
 /* GLFFT requires either GLES3 or 
@@ -806,8 +820,16 @@ extern "C" glfft_t *glfft_new(unsigned fft_steps, rglgen_proc_address_t proc)
    glfft_t *fft = (glfft_t*)calloc(1, sizeof(*fft));
    if (!fft)
       return NULL;
-   fft_context_reset(fft, fft_steps, proc, 256);
+
+   if (!fft_context_reset(fft, fft_steps, proc, 256))
+      goto error;
+
    return fft;
+
+error:
+   if (fft)
+      free(fft);
+   return NULL;
 }
 
 extern "C" void glfft_init_multisample(glfft_t *fft, unsigned width, unsigned height, unsigned samples)
@@ -847,8 +869,12 @@ extern "C" void glfft_init_multisample(glfft_t *fft, unsigned width, unsigned he
 static void fft_context_destroy(glfft_t *fft)
 {
    glfft_init_multisample(fft, 0, 0, 0);
-   fft->passes.clear();
-   fft->sliding.clear();
+   if (fft->passes)
+      free(fft->passes);
+   fft->passes = NULL;
+   if (fft->sliding)
+      free(fft->sliding);
+   fft->sliding = NULL;
 }
 
 extern "C" void glfft_free(glfft_t *fft)
