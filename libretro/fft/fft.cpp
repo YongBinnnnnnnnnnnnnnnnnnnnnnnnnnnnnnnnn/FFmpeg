@@ -56,7 +56,6 @@ struct Pass
 
 typedef struct GLFFT 
 {
-
    GLuint ms_rb_color;
    GLuint ms_rb_ds;
    GLuint ms_fbo;
@@ -88,10 +87,10 @@ typedef struct GLFFT
    GLuint pbo;
    std::vector<GLshort> sliding;
 
-   unsigned fft_steps;
-   unsigned fft_size;
-   unsigned fft_block_size;
-   unsigned fft_depth;
+   unsigned steps;
+   unsigned size;
+   unsigned block_size;
+   unsigned depth;
 } glfft_t;
 
 static const char vertex_program_heightmap[] =
@@ -361,9 +360,9 @@ static void fft_render(glfft_t *fft, GLuint backbuffer, unsigned width, unsigned
 
    glUseProgram(fft->block.prog);
    glUniformMatrix4fv(glGetUniformLocation(fft->block.prog, "uMVP"), 1, GL_FALSE, value_ptr(mvp));
-   glUniform2i(glGetUniformLocation(fft->block.prog, "uOffset"), (-int(fft->fft_block_size) + 1) / 2, fft->output_ptr);
-   glUniform4f(glGetUniformLocation(fft->block.prog, "uHeightmapParams"), -(fft->fft_block_size - 1.0f) / 2.0f, 0.0f, 3.0f, 2.0f);
-   glUniform1f(glGetUniformLocation(fft->block.prog, "uAngleScale"), M_PI / ((fft->fft_block_size - 1) / 2));
+   glUniform2i(glGetUniformLocation(fft->block.prog, "uOffset"), (-int(fft->block_size) + 1) / 2, fft->output_ptr);
+   glUniform4f(glGetUniformLocation(fft->block.prog, "uHeightmapParams"), -(fft->block_size - 1.0f) / 2.0f, 0.0f, 3.0f, 2.0f);
+   glUniform1f(glGetUniformLocation(fft->block.prog, "uAngleScale"), M_PI / ((fft->block_size - 1) / 2));
 
    glBindVertexArray(fft->block.vao);
    glBindTexture(GL_TEXTURE_2D, fft->blur.tex);
@@ -411,26 +410,26 @@ static void fft_step(glfft_t *fft, const GLshort *audio_buffer, unsigned frames)
    glBindBuffer(GL_PIXEL_UNPACK_BUFFER, fft->pbo);
 
    buffer = static_cast<GLshort*>(glMapBufferRange(GL_PIXEL_UNPACK_BUFFER, 0,
-            2 * fft->fft_size * sizeof(GLshort), GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT));
+            2 * fft->size * sizeof(GLshort), GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT));
 
    if (buffer)
    {
       memcpy(buffer, slide, fft->sliding.size() * sizeof(GLshort));
       glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
    }
-   glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, fft->fft_size, 1, GL_RG_INTEGER, GL_SHORT, NULL);
+   glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, fft->size, 1, GL_RG_INTEGER, GL_SHORT, NULL);
    glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
 
    // Perform FFT of new block.
-   glViewport(0, 0, fft->fft_size, 1);
+   glViewport(0, 0, fft->size, 1);
 
-   for (i = 0; i < fft->fft_steps; i++)
+   for (i = 0; i < fft->steps; i++)
    {
-      if (i == fft->fft_steps - 1)
+      if (i == fft->steps - 1)
       {
          glBindFramebuffer(GL_FRAMEBUFFER, fft->output.fbo);
          glUniform1i(glGetUniformLocation(i == 0 ? fft->prog_real : fft->prog_complex, "uViewportOffset"), fft->output_ptr);
-         glViewport(0, fft->output_ptr, fft->fft_size, 1);
+         glViewport(0, fft->output_ptr, fft->size, 1);
       }
       else
       {
@@ -453,10 +452,10 @@ static void fft_step(glfft_t *fft, const GLshort *audio_buffer, unsigned frames)
    glActiveTexture(GL_TEXTURE0);
 
    // Resolve new chunk to heightmap.
-   glViewport(0, fft->output_ptr, fft->fft_size, 1);
+   glViewport(0, fft->output_ptr, fft->size, 1);
    glUseProgram(fft->prog_resolve);
    glBindFramebuffer(GL_FRAMEBUFFER, fft->resolve.fbo);
-   const GLfloat resolve_offset[] = { 0.0f, float(fft->output_ptr) / fft->fft_depth, 1.0f, 1.0f / fft->fft_depth };
+   const GLfloat resolve_offset[] = { 0.0f, float(fft->output_ptr) / fft->depth, 1.0f, 1.0f / fft->depth };
    glUniform4fv(glGetUniformLocation(fft->prog_resolve, "uOffsetScale"), 1, resolve_offset);
    glBindTexture(GL_TEXTURE_2D, fft->output.tex);
    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
@@ -474,7 +473,7 @@ static void fft_step(glfft_t *fft, const GLshort *audio_buffer, unsigned frames)
    glBindTexture(GL_TEXTURE_2D, 0);
 
    fft->output_ptr++;
-   fft->output_ptr &= fft->fft_depth - 1;
+   fft->output_ptr &= fft->depth - 1;
 
    glBindVertexArray(0);
    glUseProgram(0);
@@ -660,49 +659,49 @@ static void fft_init(glfft_t *fft)
 
    GL_CHECK_ERROR();
 
-   fft_init_texture(fft, &fft->window_tex, GL_R16UI, fft->fft_size, 1, 1, GL_NEAREST, GL_NEAREST);
+   fft_init_texture(fft, &fft->window_tex, GL_R16UI, fft->size, 1, 1, GL_NEAREST, GL_NEAREST);
    GL_CHECK_ERROR();
 
-   std::vector<GLushort> window(fft->fft_size);
+   std::vector<GLushort> window(fft->size);
    window_mod = 1.0 / kaiser_window(0.0, KAISER_BETA);
 
-   for (i = 0; i < fft->fft_size; i++)
+   for (i = 0; i < fft->size; i++)
    {
-      double phase = (double)(i - int(fft->fft_size) / 2) / (int(fft->fft_size) / 2);
+      double phase = (double)(i - int(fft->size) / 2) / (int(fft->size) / 2);
       double     w = kaiser_window(phase, KAISER_BETA);
       window[i]    = round(0xffff * w * window_mod);
    }
    glBindTexture(GL_TEXTURE_2D, fft->window_tex);
-   glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, fft->fft_size, 1, GL_RED_INTEGER, GL_UNSIGNED_SHORT, &window[0]);
+   glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, fft->size, 1, GL_RED_INTEGER, GL_UNSIGNED_SHORT, &window[0]);
    glBindTexture(GL_TEXTURE_2D, 0);
 
    GL_CHECK_ERROR();
-   fft_init_texture(fft, &fft->input_tex, GL_RG16I, fft->fft_size, 1, 1, GL_NEAREST, GL_NEAREST);
-   fft_init_target(fft, &fft->output, GL_RG32UI, fft->fft_size, fft->fft_depth, 1, GL_NEAREST, GL_NEAREST);
-   fft_init_target(fft, &fft->resolve, GL_RGBA8, fft->fft_size, fft->fft_depth, 1, GL_NEAREST, GL_NEAREST);
-   fft_init_target(fft, &fft->blur, GL_RGBA8, fft->fft_size, fft->fft_depth,
-         log2i(MAX(fft->fft_size, fft->fft_depth)) + 1, GL_NEAREST, GL_LINEAR_MIPMAP_LINEAR);
+   fft_init_texture(fft, &fft->input_tex, GL_RG16I, fft->size, 1, 1, GL_NEAREST, GL_NEAREST);
+   fft_init_target(fft, &fft->output, GL_RG32UI, fft->size, fft->depth, 1, GL_NEAREST, GL_NEAREST);
+   fft_init_target(fft, &fft->resolve, GL_RGBA8, fft->size, fft->depth, 1, GL_NEAREST, GL_NEAREST);
+   fft_init_target(fft, &fft->blur, GL_RGBA8, fft->size, fft->depth,
+         log2i(MAX(fft->size, fft->depth)) + 1, GL_NEAREST, GL_LINEAR_MIPMAP_LINEAR);
 
    GL_CHECK_ERROR();
 
-   for (i = 0; i < fft->fft_steps; i++)
+   for (i = 0; i < fft->steps; i++)
    {
-      fft_init_target(fft, &fft->passes[i].target, GL_RG32UI, fft->fft_size, 1, 1, GL_NEAREST, GL_NEAREST);
-      fft_init_texture(fft, &fft->passes[i].parameter_tex, GL_RG32UI, fft->fft_size, 1, 1, GL_NEAREST, GL_NEAREST);
+      fft_init_target(fft, &fft->passes[i].target, GL_RG32UI, fft->size, 1, 1, GL_NEAREST, GL_NEAREST);
+      fft_init_texture(fft, &fft->passes[i].parameter_tex, GL_RG32UI, fft->size, 1, 1, GL_NEAREST, GL_NEAREST);
 
-      std::vector<GLuint> param_buffer(2 * fft->fft_size);
-      fft_build_params(fft, &param_buffer[0], i, fft->fft_size);
+      std::vector<GLuint> param_buffer(2 * fft->size);
+      fft_build_params(fft, &param_buffer[0], i, fft->size);
 
       glBindTexture(GL_TEXTURE_2D, fft->passes[i].parameter_tex);
       glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0,
-            fft->fft_size, 1, GL_RG_INTEGER, GL_UNSIGNED_INT, &param_buffer[0]);
+            fft->size, 1, GL_RG_INTEGER, GL_UNSIGNED_INT, &param_buffer[0]);
       glBindTexture(GL_TEXTURE_2D, 0);
    }
 
    GL_CHECK_ERROR();
    glGenBuffers(1, &fft->pbo);
    glBindBuffer(GL_PIXEL_UNPACK_BUFFER, fft->pbo);
-   glBufferData(GL_PIXEL_UNPACK_BUFFER, fft->fft_size * 2 * sizeof(GLshort), 0, GL_DYNAMIC_DRAW);
+   glBufferData(GL_PIXEL_UNPACK_BUFFER, fft->size * 2 * sizeof(GLshort), 0, GL_DYNAMIC_DRAW);
    glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
 }
 
@@ -716,31 +715,31 @@ static void fft_init_block(glfft_t *fft)
    glUseProgram(fft->block.prog);
    glUniform1i(glGetUniformLocation(fft->block.prog, "sHeight"), 0);
 
-   std::vector<GLushort> block_vertices(2 * fft->fft_block_size * fft->fft_depth);
-   for (y = 0; y < fft->fft_depth; y++)
+   std::vector<GLushort> block_vertices(2 * fft->block_size * fft->depth);
+   for (y = 0; y < fft->depth; y++)
    {
-      for (x = 0; x < fft->fft_block_size; x++)
+      for (x = 0; x < fft->block_size; x++)
       {
-         block_vertices[2 * (y * fft->fft_block_size + x) + 0] = x;
-         block_vertices[2 * (y * fft->fft_block_size + x) + 1] = y;
+         block_vertices[2 * (y * fft->block_size + x) + 0] = x;
+         block_vertices[2 * (y * fft->block_size + x) + 1] = y;
       }
    }
    glGenBuffers(1, &fft->block.vbo);
    glBindBuffer(GL_ARRAY_BUFFER, fft->block.vbo);
    glBufferData(GL_ARRAY_BUFFER, block_vertices.size() * sizeof(GLushort), &block_vertices[0], GL_STATIC_DRAW);
 
-   fft->block.elems = (2 * fft->fft_block_size - 1) * (fft->fft_depth - 1) + 1;
+   fft->block.elems = (2 * fft->block_size - 1) * (fft->depth - 1) + 1;
    std::vector<GLuint> block_indices(fft->block.elems);
 
    bp = &block_indices[0];
 
-   for (y = 0; y < fft->fft_depth - 1; y++)
+   for (y = 0; y < fft->depth - 1; y++)
    {
       int x;
-      int step_odd = -int(fft->fft_block_size) + ((y & 1) ? -1 : 1);
-      int step_even = fft->fft_block_size;
+      int step_odd = -int(fft->block_size) + ((y & 1) ? -1 : 1);
+      int step_even = fft->block_size;
 
-      for (x = 0; x < 2 * int(fft->fft_block_size) - 1; x++)
+      for (x = 0; x < 2 * int(fft->block_size) - 1; x++)
       {
          *bp++ = pos;
          pos += (x & 1) ? step_odd : step_even;
@@ -768,13 +767,13 @@ static void fft_context_reset(glfft_t *fft, unsigned fft_steps,
 {
    rglgen_resolve_symbols(proc);
 
-   fft->fft_steps       = fft_steps;
-   fft->fft_depth       = fft_depth;
-   fft->fft_size        = 1 << fft_steps;
-   fft->fft_block_size  = fft->fft_size / 4 + 1;
+   fft->steps       = fft_steps;
+   fft->depth       = fft_depth;
+   fft->size        = 1 << fft_steps;
+   fft->block_size  = fft->size / 4 + 1;
 
    fft->passes.resize(fft_steps);
-   fft->sliding.resize(2 * fft->fft_size);
+   fft->sliding.resize(2 * fft->size);
 
    GL_CHECK_ERROR();
    fft_init_quad_vao(fft);
