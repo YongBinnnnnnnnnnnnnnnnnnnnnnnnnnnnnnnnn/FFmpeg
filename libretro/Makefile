@@ -127,10 +127,7 @@ endif
 HAVE_PTHREADS = 1
    OSXVER = `sw_vers -productVersion | cut -d. -f 2`
    OSX_LT_MAVERICKS = `(( $(OSXVER) <= 9)) && echo "YES"`
-ifeq ($(OSX_LT_MAVERICKS),"YES")
-   fpic += -mmacosx-version-min=10.5
-endif
-
+   fpic += -mmacosx-version-min=10.1
 	CFLAGS += -DHAVE_STRUCT_SOCKADDR_STORAGE -DHAVE_STRUCT_ADDRINFO
 	HAVE_POLL_H = 1
 	HAVE_GETADDRINFO = 1
