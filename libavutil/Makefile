@@ -63,6 +63,7 @@ HEADERS = adler32.h                                                     \
           twofish.h                                                     \
           version.h                                                     \
           xtea.h                                                        \
+          tea.h                                                         \
 
 HEADERS-$(CONFIG_LZO)                   += lzo.h
 
@@ -78,7 +79,6 @@ BUILT_HEADERS = avconfig.h                                              \
 
 OBJS = adler32.o                                                        \
        aes.o                                                            \
-       atomic.o                                                         \
        audio_fifo.o                                                     \
        avstring.o                                                       \
        base64.o                                                         \
@@ -135,6 +135,9 @@ OBJS = adler32.o                                                        \
        utils.o                                                          \
        xga_font_data.o                                                  \
        xtea.o                                                           \
+       tea.o                                                            \
+
+OBJS-$(!HAVE_ATOMICS_NATIVE)            += atomic.o                     \
 
 OBJS-$(CONFIG_LZO)                      += lzo.o
 OBJS-$(CONFIG_OPENCL)                   += opencl.o opencl_internal.o
@@ -190,6 +193,7 @@ TESTPROGS = adler32                                                     \
             twofish                                                     \
             utf8                                                        \
             xtea                                                        \
+            tea                                                         \
 
 TESTPROGS-$(HAVE_LZO1X_999_COMPRESS) += lzo
 

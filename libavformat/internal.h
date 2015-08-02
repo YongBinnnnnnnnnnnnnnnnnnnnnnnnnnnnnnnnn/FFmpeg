@@ -34,7 +34,7 @@
 #ifdef DEBUG
 #    define hex_dump_debug(class, buf, size) av_hex_dump_log(class, AV_LOG_DEBUG, buf, size)
 #else
-#    define hex_dump_debug(class, buf, size)
+#    define hex_dump_debug(class, buf, size) do { if (0) av_hex_dump_log(class, AV_LOG_DEBUG, buf, size); } while(0)
 #endif
 
 typedef struct AVCodecTag {
@@ -97,6 +97,8 @@ struct AVFormatInternal {
     AVRational offset_timebase;
 
     int inject_global_side_data;
+
+    int avoid_negative_ts_use_pts;
 };
 
 #ifdef __GNUC__
@@ -251,6 +253,8 @@ int ff_add_index_entry(AVIndexEntry **index_entries,
                        int *nb_index_entries,
                        unsigned int *index_entries_allocated_size,
                        int64_t pos, int64_t timestamp, int size, int distance, int flags);
+
+void ff_configure_buffers_for_index(AVFormatContext *s, int64_t time_tolerance);
 
 /**
  * Add a new chapter.
@@ -409,6 +413,11 @@ enum AVCodecID ff_get_pcm_codec_id(int bps, int flt, int be, int sflags);
 AVRational ff_choose_timebase(AVFormatContext *s, AVStream *st, int min_precision);
 
 /**
+ * Chooses a timebase for muxing the specified stream.
+ */
+enum AVChromaLocation ff_choose_chroma_location(AVFormatContext *s, AVStream *st);
+
+/**
  * Generate standard extradata for AVC-Intra based on width/height and field
  * order.
  */
@@ -440,7 +449,7 @@ uint8_t *ff_stream_new_side_data(AVStream *st, enum AVPacketSideDataType type,
                                  int size);
 
 /**
- * Allocate extradata with additional FF_INPUT_BUFFER_PADDING_SIZE at end
+ * Allocate extradata with additional AV_INPUT_BUFFER_PADDING_SIZE at end
  * which is always set to 0.
  *
  * @param size size of extradata
@@ -449,7 +458,7 @@ uint8_t *ff_stream_new_side_data(AVStream *st, enum AVPacketSideDataType type,
 int ff_alloc_extradata(AVCodecContext *avctx, int size);
 
 /**
- * Allocate extradata with additional FF_INPUT_BUFFER_PADDING_SIZE at end
+ * Allocate extradata with additional AV_INPUT_BUFFER_PADDING_SIZE at end
  * which is always set to 0 and fill it from pb.
  *
  * @param size size of extradata
@@ -484,5 +493,8 @@ enum AVWriteUncodedFrameFlags {
  * Copies the whilelists from one context to the other
  */
 int ff_copy_whitelists(AVFormatContext *dst, AVFormatContext *src);
+
+int ffio_open2_wrapper(struct AVFormatContext *s, AVIOContext **pb, const char *url, int flags,
+                       const AVIOInterruptCB *int_cb, AVDictionary **options);
 
 #endif /* AVFORMAT_INTERNAL_H */

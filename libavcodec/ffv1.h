@@ -87,6 +87,7 @@ typedef struct FFV1Context {
     int transparency;
     int flags;
     int picture_number;
+    int key_frame;
     ThreadFrame picture, last_picture;
     struct FFV1Context *fsrc;
 
@@ -143,7 +144,7 @@ static av_always_inline int fold(int diff, int bits)
         diff = (int8_t)diff;
     else {
         diff +=  1 << (bits  - 1);
-        diff &= (1 <<  bits) - 1;
+        diff  = av_mod_uintp2(diff, bits);
         diff -=  1 << (bits  - 1);
     }
 

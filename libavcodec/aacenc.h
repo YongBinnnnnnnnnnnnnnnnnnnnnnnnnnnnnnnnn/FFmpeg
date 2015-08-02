@@ -42,6 +42,8 @@ typedef enum AACCoder {
 typedef struct AACEncOptions {
     int stereo_mode;
     int aac_coder;
+    int pns;
+    int intensity_stereo;
 } AACEncOptions;
 
 struct AACEncContext;
@@ -52,8 +54,11 @@ typedef struct AACCoefficientsEncoder {
     void (*encode_window_bands_info)(struct AACEncContext *s, SingleChannelElement *sce,
                                      int win, int group_len, const float lambda);
     void (*quantize_and_encode_band)(struct AACEncContext *s, PutBitContext *pb, const float *in, int size,
-                                     int scale_idx, int cb, const float lambda);
-    void (*search_for_ms)(struct AACEncContext *s, ChannelElement *cpe, const float lambda);
+                                     int scale_idx, int cb, const float lambda, int rtz);
+    void (*set_special_band_scalefactors)(struct AACEncContext *s, SingleChannelElement *sce);
+    void (*search_for_pns)(struct AACEncContext *s, AVCodecContext *avctx, SingleChannelElement *sce);
+    void (*search_for_ms)(struct AACEncContext *s, ChannelElement *cpe);
+    void (*search_for_is)(struct AACEncContext *s, AVCodecContext *avctx, ChannelElement *cpe);
 } AACCoefficientsEncoder;
 
 extern AACCoefficientsEncoder ff_aac_coders[];
@@ -89,8 +94,6 @@ typedef struct AACEncContext {
         float *samples;
     } buffer;
 } AACEncContext;
-
-extern float ff_aac_pow34sf_tab[428];
 
 void ff_aac_coder_init_mips(AACEncContext *c);
 

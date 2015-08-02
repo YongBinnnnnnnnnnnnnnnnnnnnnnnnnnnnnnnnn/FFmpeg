@@ -1102,6 +1102,14 @@ int avpriv_dnxhd_get_frame_size(int cid)
     return ff_dnxhd_cid_table[i].frame_size;
 }
 
+int avpriv_dnxhd_get_interlaced(int cid)
+{
+    int i = ff_dnxhd_get_cid_table(cid);
+    if (i < 0)
+        return i;
+    return ff_dnxhd_cid_table[i].interlaced;
+}
+
 int ff_dnxhd_find_cid(AVCodecContext *avctx, int bit_depth)
 {
     int i, j;
@@ -1111,7 +1119,7 @@ int ff_dnxhd_find_cid(AVCodecContext *avctx, int bit_depth)
     for (i = 0; i < FF_ARRAY_ELEMS(ff_dnxhd_cid_table); i++) {
         const CIDEntry *cid = &ff_dnxhd_cid_table[i];
         if (cid->width == avctx->width && cid->height == avctx->height &&
-            cid->interlaced == !!(avctx->flags & CODEC_FLAG_INTERLACED_DCT) &&
+            cid->interlaced == !!(avctx->flags & AV_CODEC_FLAG_INTERLACED_DCT) &&
             cid->bit_depth == bit_depth) {
             for (j = 0; j < FF_ARRAY_ELEMS(cid->bit_rates); j++) {
                 if (cid->bit_rates[j] == mbs)

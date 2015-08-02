@@ -39,7 +39,7 @@ static av_cold int encode_init(AVCodecContext *avctx)
     int i;
 
     if(avctx->prediction_method == DWT_97
-       && (avctx->flags & CODEC_FLAG_QSCALE)
+       && (avctx->flags & AV_CODEC_FLAG_QSCALE)
        && avctx->global_quality == 0){
         av_log(avctx, AV_LOG_ERROR, "The 9/7 wavelet is incompatible with lossless mode.\n");
         return -1;
@@ -47,8 +47,8 @@ static av_cold int encode_init(AVCodecContext *avctx)
 
     s->spatial_decomposition_type= avctx->prediction_method; //FIXME add decorrelator type r transform_type
 
-    s->mv_scale       = (avctx->flags & CODEC_FLAG_QPEL) ? 2 : 4;
-    s->block_max_depth= (avctx->flags & CODEC_FLAG_4MV ) ? 1 : 0;
+    s->mv_scale       = (avctx->flags & AV_CODEC_FLAG_QPEL) ? 2 : 4;
+    s->block_max_depth= (avctx->flags & AV_CODEC_FLAG_4MV ) ? 1 : 0;
 
     for(plane_index=0; plane_index<3; plane_index++){
         s->plane[plane_index].diag_mc= 1;
@@ -60,7 +60,6 @@ static av_cold int encode_init(AVCodecContext *avctx)
     }
 
     if ((ret = ff_snow_common_init(avctx)) < 0) {
-        ff_snow_common_end(avctx->priv_data);
         return ret;
     }
     ff_mpegvideoencdsp_init(&s->mpvencdsp, avctx);
@@ -70,33 +69,32 @@ static av_cold int encode_init(AVCodecContext *avctx)
     s->version=0;
 
     s->m.avctx   = avctx;
-    s->m.flags   = avctx->flags;
     s->m.bit_rate= avctx->bit_rate;
 
     s->m.me.temp      =
     s->m.me.scratchpad= av_mallocz_array((avctx->width+64), 2*16*2*sizeof(uint8_t));
     s->m.me.map       = av_mallocz(ME_MAP_SIZE*sizeof(uint32_t));
     s->m.me.score_map = av_mallocz(ME_MAP_SIZE*sizeof(uint32_t));
-    s->m.obmc_scratchpad= av_mallocz(MB_SIZE*MB_SIZE*12*sizeof(uint32_t));
-    if (!s->m.me.scratchpad || !s->m.me.map || !s->m.me.score_map || !s->m.obmc_scratchpad)
+    s->m.sc.obmc_scratchpad= av_mallocz(MB_SIZE*MB_SIZE*12*sizeof(uint32_t));
+    if (!s->m.me.scratchpad || !s->m.me.map || !s->m.me.score_map || !s->m.sc.obmc_scratchpad)
         return AVERROR(ENOMEM);
 
     ff_h263_encode_init(&s->m); //mv_penalty
 
-    s->max_ref_frames = FFMAX(FFMIN(avctx->refs, MAX_REF_FRAMES), 1);
+    s->max_ref_frames = av_clip(avctx->refs, 1, MAX_REF_FRAMES);
 
-    if(avctx->flags&CODEC_FLAG_PASS1){
+    if(avctx->flags&AV_CODEC_FLAG_PASS1){
         if(!avctx->stats_out)
             avctx->stats_out = av_mallocz(256);
 
         if (!avctx->stats_out)
             return AVERROR(ENOMEM);
     }
-    if((avctx->flags&CODEC_FLAG_PASS2) || !(avctx->flags&CODEC_FLAG_QSCALE)){
+    if((avctx->flags&AV_CODEC_FLAG_PASS2) || !(avctx->flags&CODEC_FLAG_QSCALE)){
         if(ff_rate_control_init(&s->m) < 0)
             return -1;
     }
-    s->pass1_rc= !(avctx->flags & (CODEC_FLAG_QSCALE|CODEC_FLAG_PASS2));
+    s->pass1_rc= !(avctx->flags & (AV_CODEC_FLAG_QSCALE|CODEC_FLAG_PASS2));
 
     switch(avctx->pix_fmt){
     case AV_PIX_FMT_YUV444P:
@@ -124,8 +122,7 @@ static av_cold int encode_init(AVCodecContext *avctx)
     ff_set_cmp(&s->mecc, s->mecc.me_sub_cmp, s->avctx->me_sub_cmp);
 
     s->input_picture = av_frame_alloc();
-    avctx->coded_frame = av_frame_alloc();
-    if (!s->input_picture || !avctx->coded_frame)
+    if (!s->input_picture)
         return AVERROR(ENOMEM);
 
     if ((ret = ff_snow_get_buffer(s, s->input_picture)) < 0)
@@ -244,7 +241,7 @@ static int encode_q_branch(SnowContext *s, int level, int x, int y){
                                 s->input_picture->data[2] + ((x*block_w)>>s->chroma_h_shift) + ((y*uvstride*block_w)>>s->chroma_v_shift)};
     int P[10][2];
     int16_t last_mv[3][2];
-    int qpel= !!(s->avctx->flags & CODEC_FLAG_QPEL); //unused
+    int qpel= !!(s->avctx->flags & AV_CODEC_FLAG_QPEL); //unused
     const int shift= 1+qpel;
     MotionEstContext *c= &s->m.me;
     int ref_context= av_log2(2*left->ref) + av_log2(2*top->ref);
@@ -503,7 +500,7 @@ static int get_dc(SnowContext *s, int mb_x, int mb_y, int plane_index){
     const int obmc_stride= plane_index ? (2*block_size)>>s->chroma_h_shift : 2*block_size;
     const int ref_stride= s->current_picture->linesize[plane_index];
     uint8_t *src= s-> input_picture->data[plane_index];
-    IDWTELEM *dst= (IDWTELEM*)s->m.obmc_scratchpad + plane_index*block_size*block_size*4; //FIXME change to unsigned
+    IDWTELEM *dst= (IDWTELEM*)s->m.sc.obmc_scratchpad + plane_index*block_size*block_size*4; //FIXME change to unsigned
     const int b_stride = s->b_width << s->block_max_depth;
     const int w= p->width;
     const int h= p->height;
@@ -598,7 +595,7 @@ static int get_block_rd(SnowContext *s, int mb_x, int mb_y, int plane_index, uin
     const int ref_stride= s->current_picture->linesize[plane_index];
     uint8_t *dst= s->current_picture->data[plane_index];
     uint8_t *src= s->  input_picture->data[plane_index];
-    IDWTELEM *pred= (IDWTELEM*)s->m.obmc_scratchpad + plane_index*block_size*block_size*4;
+    IDWTELEM *pred= (IDWTELEM*)s->m.sc.obmc_scratchpad + plane_index*block_size*block_size*4;
     uint8_t *cur = s->scratchbuf;
     uint8_t *tmp = s->emu_edge_buffer;
     const int b_stride = s->b_width << s->block_max_depth;
@@ -913,7 +910,7 @@ static av_always_inline int check_block(SnowContext *s, int mb_x, int mb_y, int 
         block->type &= ~BLOCK_INTRA;
     }
 
-    rd= get_block_rd(s, mb_x, mb_y, 0, obmc_edged);
+    rd= get_block_rd(s, mb_x, mb_y, 0, obmc_edged) + s->intra_penalty * !!intra;
 
 //FIXME chroma
     if(rd < *best_rd){
@@ -1113,13 +1110,15 @@ static void iterative_me(SnowContext *s){
                     /* fullpel ME */
                     //FIXME avoid subpel interpolation / round to nearest integer
                     do{
+                        int newx = block->mx;
+                        int newy = block->my;
                         dia_change=0;
                         for(i=0; i<FFMAX(s->avctx->dia_size, 1); i++){
                             for(j=0; j<i; j++){
-                                dia_change |= check_block_inter(s, mb_x, mb_y, block->mx+4*(i-j), block->my+(4*j), obmc_edged, &best_rd);
-                                dia_change |= check_block_inter(s, mb_x, mb_y, block->mx-4*(i-j), block->my-(4*j), obmc_edged, &best_rd);
-                                dia_change |= check_block_inter(s, mb_x, mb_y, block->mx+4*(i-j), block->my-(4*j), obmc_edged, &best_rd);
-                                dia_change |= check_block_inter(s, mb_x, mb_y, block->mx-4*(i-j), block->my+(4*j), obmc_edged, &best_rd);
+                                dia_change |= check_block_inter(s, mb_x, mb_y, newx+4*(i-j), newy+(4*j), obmc_edged, &best_rd);
+                                dia_change |= check_block_inter(s, mb_x, mb_y, newx-4*(i-j), newy-(4*j), obmc_edged, &best_rd);
+                                dia_change |= check_block_inter(s, mb_x, mb_y, newx-(4*j), newy+4*(i-j), obmc_edged, &best_rd);
+                                dia_change |= check_block_inter(s, mb_x, mb_y, newx+(4*j), newy-4*(i-j), obmc_edged, &best_rd);
                             }
                         }
                     }while(dia_change);
@@ -1156,7 +1155,7 @@ static void iterative_me(SnowContext *s){
                 }
             }
         }
-        av_log(s->avctx, AV_LOG_ERROR, "pass:%d changed:%d\n", pass, change);
+        av_log(s->avctx, AV_LOG_DEBUG, "pass:%d changed:%d\n", pass, change);
         if(!change)
             break;
     }
@@ -1556,11 +1555,11 @@ static int encode_frame(AVCodecContext *avctx, AVPacket *pkt,
     uint8_t rc_header_bak[sizeof(s->header_state)];
     uint8_t rc_block_bak[sizeof(s->block_state)];
 
-    if ((ret = ff_alloc_packet2(avctx, pkt, s->b_width*s->b_height*MB_SIZE*MB_SIZE*3 + FF_MIN_BUFFER_SIZE)) < 0)
+    if ((ret = ff_alloc_packet2(avctx, pkt, s->b_width*s->b_height*MB_SIZE*MB_SIZE*3 + AV_INPUT_BUFFER_MIN_SIZE, 0)) < 0)
         return ret;
 
     ff_init_range_encoder(c, pkt->data, pkt->size);
-    ff_build_rac_states(c, 0.05*(1LL<<32), 256-8);
+    ff_build_rac_states(c, (1LL<<32)/20, 256-8);
 
     for(i=0; i < s->nb_planes; i++){
         int hshift= i ? s->chroma_h_shift : 0;
@@ -1579,10 +1578,10 @@ static int encode_frame(AVCodecContext *avctx, AVPacket *pkt,
     s->new_picture = pict;
 
     s->m.picture_number= avctx->frame_number;
-    if(avctx->flags&CODEC_FLAG_PASS2){
+    if(avctx->flags&AV_CODEC_FLAG_PASS2){
         s->m.pict_type = pic->pict_type = s->m.rc_context.entry[avctx->frame_number].new_pict_type;
         s->keyframe = pic->pict_type == AV_PICTURE_TYPE_I;
-        if(!(avctx->flags&CODEC_FLAG_QSCALE)) {
+        if(!(avctx->flags&AV_CODEC_FLAG_QSCALE)) {
             pic->quality = ff_rate_estimate_qscale(&s->m, 0);
             if (pic->quality < 0)
                 return -1;
@@ -1598,7 +1597,7 @@ static int encode_frame(AVCodecContext *avctx, AVPacket *pkt,
         s->qlog   = qscale2qlog(pic->quality);
         s->lambda = pic->quality * 3/2;
     }
-    if (s->qlog < 0 || (!pic->quality && (avctx->flags & CODEC_FLAG_QSCALE))) {
+    if (s->qlog < 0 || (!pic->quality && (avctx->flags & AV_CODEC_FLAG_QSCALE))) {
         s->qlog= LOSSLESS_QLOG;
         s->lambda = 0;
     }//else keep previous frame's qlog until after motion estimation
@@ -1622,7 +1621,9 @@ static int encode_frame(AVCodecContext *avctx, AVPacket *pkt,
 
     ff_snow_frame_start(s);
     av_frame_unref(avctx->coded_frame);
-    av_frame_ref(avctx->coded_frame, s->current_picture);
+    ret = av_frame_ref(avctx->coded_frame, s->current_picture);
+    if (ret < 0)
+        return ret;
 
     s->m.current_picture_ptr= &s->m.current_picture;
     s->m.current_picture.f = s->current_picture;
@@ -1651,8 +1652,8 @@ static int encode_frame(AVCodecContext *avctx, AVPacket *pkt,
         s->m.pict_type = pic->pict_type;
         s->m.me_method= s->avctx->me_method;
         s->m.me.scene_change_score=0;
-        s->m.flags= s->avctx->flags;
-        s->m.quarter_sample= (s->avctx->flags & CODEC_FLAG_QPEL)!=0;
+        s->m.me.dia_size = avctx->dia_size;
+        s->m.quarter_sample= (s->avctx->flags & AV_CODEC_FLAG_QPEL)!=0;
         s->m.out_format= FMT_H263;
         s->m.unrestricted_mv= 1;
 
@@ -1721,10 +1722,10 @@ redo_frame:
 
             if(   plane_index==0
                && pic->pict_type == AV_PICTURE_TYPE_P
-               && !(avctx->flags&CODEC_FLAG_PASS2)
+               && !(avctx->flags&AV_CODEC_FLAG_PASS2)
                && s->m.me.scene_change_score > s->avctx->scenechange_threshold){
                 ff_init_range_encoder(c, pkt->data, pkt->size);
-                ff_build_rac_states(c, 0.05*(1LL<<32), 256-8);
+                ff_build_rac_states(c, (1LL<<32)/20, 256-8);
                 pic->pict_type= AV_PICTURE_TYPE_I;
                 s->keyframe=1;
                 s->current_picture->key_frame=1;
@@ -1807,7 +1808,7 @@ redo_frame:
                 predict_plane(s, s->spatial_idwt_buffer, plane_index, 1);
             }
         }
-        if(s->avctx->flags&CODEC_FLAG_PSNR){
+        if(s->avctx->flags&AV_CODEC_FLAG_PSNR){
             int64_t error= 0;
 
             if(pict->data[plane_index]) //FIXME gray hack
@@ -1839,7 +1840,7 @@ redo_frame:
     if(s->pass1_rc)
         if (ff_rate_estimate_qscale(&s->m, 0) < 0)
             return -1;
-    if(avctx->flags&CODEC_FLAG_PASS1)
+    if(avctx->flags&AV_CODEC_FLAG_PASS1)
         ff_write_pass1_stats(&s->m);
     s->m.last_pict_type = s->m.pict_type;
     avctx->frame_bits = s->m.frame_bits;
@@ -1849,8 +1850,13 @@ redo_frame:
 
     emms_c();
 
+    ff_side_data_set_encoder_stats(pkt, s->current_picture->quality,
+                                   s->current_picture->error,
+                                   (s->avctx->flags&AV_CODEC_FLAG_PSNR) ? 4 : 0,
+                                   s->current_picture->pict_type);
+
     pkt->size = ff_rac_terminate(c);
-    if (avctx->coded_frame->key_frame)
+    if (s->current_picture->key_frame)
         pkt->flags |= AV_PKT_FLAG_KEY;
     *got_packet = 1;
 
@@ -1864,7 +1870,6 @@ static av_cold int encode_end(AVCodecContext *avctx)
     ff_snow_common_end(s);
     ff_rate_control_uninit(&s->m);
     av_frame_free(&s->input_picture);
-    av_frame_free(&avctx->coded_frame);
     av_freep(&avctx->stats_out);
 
     return 0;
@@ -1876,6 +1881,7 @@ static const AVOption options[] = {
     FF_MPV_COMMON_OPTS
     { "memc_only",      "Only do ME/MC (I frames -> ref, P frame -> ME+MC).",   OFFSET(memc_only), AV_OPT_TYPE_INT, { .i64 = 0 }, 0, 1, VE },
     { "no_bitstream",   "Skip final bitstream writeout.",                    OFFSET(no_bitstream), AV_OPT_TYPE_INT, { .i64 = 0 }, 0, 1, VE },
+    { "intra_penalty",  "Penalty for intra blocks in block decission",      OFFSET(intra_penalty), AV_OPT_TYPE_INT, { .i64 = 0 }, 0, INT_MAX, VE },
     { NULL },
 };
 
@@ -1901,6 +1907,8 @@ AVCodec ff_snow_encoder = {
         AV_PIX_FMT_NONE
     },
     .priv_class     = &snowenc_class,
+    .caps_internal  = FF_CODEC_CAP_INIT_THREADSAFE |
+                      FF_CODEC_CAP_INIT_CLEANUP,
 };
 
 

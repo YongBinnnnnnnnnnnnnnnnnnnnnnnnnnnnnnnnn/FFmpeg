@@ -228,7 +228,7 @@ autocmd InsertEnter * match ForbiddenWhitespace /\t\|\s\+\%#\@@<!$/
 @end example
 
 For Emacs, add these roughly equivalent lines to your @file{.emacs.d/init.el}:
-@example
+@lisp
 (c-add-style "ffmpeg"
              '("k&r"
                (c-basic-offset . 4)
@@ -239,7 +239,7 @@ For Emacs, add these roughly equivalent lines to your @file{.emacs.d/init.el}:
                )
              )
 (setq c-default-style "ffmpeg")
-@end example
+@end lisp
 
 @section Development Policy
 
@@ -542,6 +542,10 @@ tools/trasher, the noise bitstream filter, and
 @uref{http://caca.zoy.org/wiki/zzuf, zzuf}. Your decoder or demuxer
 should not crash, end in a (near) infinite loop, or allocate ridiculous
 amounts of memory when fed damaged data.
+
+@item
+Did you test your decoder or demuxer against sample files?
+Samples may be obtained at @url{http://samples.ffmpeg.org}.
 
 @item
 Does the patch not mix functional and cosmetic changes?

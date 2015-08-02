@@ -60,6 +60,7 @@ include $(SRC_PATH)/common.mak
 
 FF_EXTRALIBS := $(FFEXTRALIBS)
 FF_DEP_LIBS  := $(DEP_LIBS)
+FF_STATIC_DEP_LIBS := $(STATIC_DEP_LIBS)
 
 all: $(AVPROGS)
 
@@ -80,8 +81,8 @@ SUBDIR_VARS := CLEANFILES EXAMPLES FFLIBS HOSTPROGS TESTPROGS TOOLS      \
                HEADERS ARCH_HEADERS BUILT_HEADERS SKIPHEADERS            \
                ARMV5TE-OBJS ARMV6-OBJS ARMV8-OBJS VFP-OBJS NEON-OBJS     \
                ALTIVEC-OBJS MMX-OBJS YASM-OBJS                           \
-               MIPSFPU-OBJS MIPSDSPR2-OBJS MIPSDSPR1-OBJS                \
-               OBJS SLIBOBJS HOSTOBJS TESTOBJS
+               MIPSFPU-OBJS MIPSDSPR2-OBJS MIPSDSPR1-OBJS MSA-OBJS       \
+               MMI-OBJS OBJS SLIBOBJS HOSTOBJS TESTOBJS
 
 define RESET
 $(1) :=
@@ -175,7 +176,7 @@ clean::
 
 distclean::
 	$(RM) $(DISTCLEANSUFFIXES)
-	$(RM) config.* .config libavutil/avconfig.h .version version.h libavutil/ffversion.h libavcodec/codec_names.h
+	$(RM) config.* .config libavutil/avconfig.h .version avversion.h version.h libavutil/ffversion.h libavcodec/codec_names.h
 
 config:
 	$(SRC_PATH)/configure $(value FFMPEG_CONFIGURATION)

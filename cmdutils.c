@@ -41,8 +41,10 @@
 #include "libavutil/avassert.h"
 #include "libavutil/avstring.h"
 #include "libavutil/bprint.h"
+#include "libavutil/display.h"
 #include "libavutil/mathematics.h"
 #include "libavutil/imgutils.h"
+#include "libavutil/libm.h"
 #include "libavutil/parseutils.h"
 #include "libavutil/pixdesc.h"
 #include "libavutil/eval.h"
@@ -480,10 +482,22 @@ static void dump_argument(const char *a)
     fputc('"', report_file);
 }
 
+static void check_options(const OptionDef *po)
+{
+    while (po->name) {
+        if (po->flags & OPT_PERFILE)
+            av_assert0(po->flags & (OPT_INPUT | OPT_OUTPUT));
+        po++;
+    }
+}
+
 void parse_loglevel(int argc, char **argv, const OptionDef *options)
 {
     int idx = locate_option(argc, argv, options, "loglevel");
     const char *env;
+
+    check_options(options);
+
     if (!idx)
         idx = locate_option(argc, argv, options, "v");
     if (idx && argv[idx + 1])
@@ -845,6 +859,7 @@ int opt_loglevel(void *optctx, const char *opt, const char *arg)
         { "info"   , AV_LOG_INFO    },
         { "verbose", AV_LOG_VERBOSE },
         { "debug"  , AV_LOG_DEBUG   },
+        { "trace"  , AV_LOG_TRACE   },
     };
     char *tail;
     int level;
@@ -1309,12 +1324,12 @@ static void print_codec(const AVCodec *c)
     if (c->type == AVMEDIA_TYPE_VIDEO ||
         c->type == AVMEDIA_TYPE_AUDIO) {
         printf("    Threading capabilities: ");
-        switch (c->capabilities & (CODEC_CAP_FRAME_THREADS |
-                                   CODEC_CAP_SLICE_THREADS)) {
-        case CODEC_CAP_FRAME_THREADS |
-             CODEC_CAP_SLICE_THREADS: printf("frame and slice"); break;
-        case CODEC_CAP_FRAME_THREADS: printf("frame");           break;
-        case CODEC_CAP_SLICE_THREADS: printf("slice");           break;
+        switch (c->capabilities & (AV_CODEC_CAP_FRAME_THREADS |
+                                   AV_CODEC_CAP_SLICE_THREADS)) {
+        case AV_CODEC_CAP_FRAME_THREADS |
+             AV_CODEC_CAP_SLICE_THREADS: printf("frame and slice"); break;
+        case AV_CODEC_CAP_FRAME_THREADS: printf("frame");           break;
+        case AV_CODEC_CAP_SLICE_THREADS: printf("slice");           break;
         default:                      printf("no");              break;
         }
         printf("\n");
@@ -1488,11 +1503,11 @@ static void print_codecs(int encoder)
 
         while ((codec = next_codec_for_id(desc->id, codec, encoder))) {
             printf(" %c", get_media_type_char(desc->type));
-            printf((codec->capabilities & CODEC_CAP_FRAME_THREADS) ? "F" : ".");
-            printf((codec->capabilities & CODEC_CAP_SLICE_THREADS) ? "S" : ".");
-            printf((codec->capabilities & CODEC_CAP_EXPERIMENTAL)  ? "X" : ".");
-            printf((codec->capabilities & CODEC_CAP_DRAW_HORIZ_BAND)?"B" : ".");
-            printf((codec->capabilities & CODEC_CAP_DR1)           ? "D" : ".");
+            printf((codec->capabilities & AV_CODEC_CAP_FRAME_THREADS) ? "F" : ".");
+            printf((codec->capabilities & AV_CODEC_CAP_SLICE_THREADS) ? "S" : ".");
+            printf((codec->capabilities & AV_CODEC_CAP_EXPERIMENTAL)  ? "X" : ".");
+            printf((codec->capabilities & AV_CODEC_CAP_DRAW_HORIZ_BAND)?"B" : ".");
+            printf((codec->capabilities & AV_CODEC_CAP_DR1)           ? "D" : ".");
 
             printf(" %-20s %s", codec->name, codec->long_name ? codec->long_name : "");
             if (strcmp(codec->name, desc->name))
@@ -1535,10 +1550,10 @@ int show_protocols(void *optctx, const char *opt, const char *arg)
     printf("Supported file protocols:\n"
            "Input:\n");
     while ((name = avio_enum_protocols(&opaque, 0)))
-        printf("%s\n", name);
+        printf("  %s\n", name);
     printf("Output:\n");
     while ((name = avio_enum_protocols(&opaque, 1)))
-        printf("%s\n", name);
+        printf("  %s\n", name);
     return 0;
 }
 
@@ -1553,7 +1568,7 @@ int show_filters(void *optctx, const char *opt, const char *arg)
     printf("Filters:\n"
            "  T.. = Timeline support\n"
            "  .S. = Slice threading\n"
-           "  ..C = Commmand support\n"
+           "  ..C = Command support\n"
            "  A = Audio input/output\n"
            "  V = Video input/output\n"
            "  N = Dynamic number and/or type of input/output\n"
@@ -1860,64 +1875,6 @@ int read_yesno(void)
     return yesno;
 }
 
-int cmdutils_read_file(const char *filename, char **bufptr, size_t *size)
-{
-    int64_t ret;
-    FILE *f = av_fopen_utf8(filename, "rb");
-
-    if (!f) {
-        ret = AVERROR(errno);
-        av_log(NULL, AV_LOG_ERROR, "Cannot read file '%s': %s\n", filename,
-               strerror(errno));
-        return ret;
-    }
-
-    ret = fseek(f, 0, SEEK_END);
-    if (ret == -1) {
-        ret = AVERROR(errno);
-        goto out;
-    }
-
-    ret = ftell(f);
-    if (ret < 0) {
-        ret = AVERROR(errno);
-        goto out;
-    }
-    *size = ret;
-
-    ret = fseek(f, 0, SEEK_SET);
-    if (ret == -1) {
-        ret = AVERROR(errno);
-        goto out;
-    }
-
-    *bufptr = av_malloc(*size + 1);
-    if (!*bufptr) {
-        av_log(NULL, AV_LOG_ERROR, "Could not allocate file buffer\n");
-        ret = AVERROR(ENOMEM);
-        goto out;
-    }
-    ret = fread(*bufptr, 1, *size, f);
-    if (ret < *size) {
-        av_free(*bufptr);
-        if (ferror(f)) {
-            ret = AVERROR(errno);
-            av_log(NULL, AV_LOG_ERROR, "Error while reading file '%s': %s\n",
-                   filename, strerror(errno));
-        } else
-            ret = AVERROR_EOF;
-    } else {
-        ret = 0;
-        (*bufptr)[(*size)++] = '\0';
-    }
-
-out:
-    if (ret < 0)
-        av_log(NULL, AV_LOG_ERROR, "IO error: %s\n", av_err2str(ret));
-    fclose(f);
-    return ret;
-}
-
 FILE *get_preset_file(char *filename, size_t filename_size,
                       const char *preset_name, int is_path,
                       const char *codec_name)
@@ -2070,6 +2027,30 @@ void *grow_array(void *array, int elem_size, int *size, int new_size)
         return tmp;
     }
     return array;
+}
+
+double get_rotation(AVStream *st)
+{
+    AVDictionaryEntry *rotate_tag = av_dict_get(st->metadata, "rotate", NULL, 0);
+    uint8_t* displaymatrix = av_stream_get_side_data(st,
+                                                     AV_PKT_DATA_DISPLAYMATRIX, NULL);
+    double theta = 0;
+
+    if (rotate_tag && *rotate_tag->value && strcmp(rotate_tag->value, "0")) {
+        char *tail;
+        theta = av_strtod(rotate_tag->value, &tail);
+        if (*tail)
+            theta = 0;
+    }
+    if (displaymatrix && !theta)
+        theta = -av_display_rotation_get((int32_t*) displaymatrix);
+
+    theta -= 360*floor(theta/360 + 0.9/360);
+
+    if (fabs(theta - 90*round(theta/90)) > 2)
+        av_log_ask_for_sample(NULL, "Odd rotation angle\n");
+
+    return theta;
 }
 
 #if CONFIG_AVDEVICE
@@ -2228,4 +2209,5 @@ int show_sinks(void *optctx, const char *opt, const char *arg)
     av_log_set_level(error_level);
     return ret;
 }
+
 #endif
