@@ -349,7 +349,7 @@ static void fft_render(glfft_t *fft, GLuint backbuffer, unsigned width, unsigned
 {
    mat4 mvp;
 
-   // Render scene.
+   /* Render scene. */
    glBindFramebuffer(GL_FRAMEBUFFER, fft->ms_fbo ? fft->ms_fbo : backbuffer);
    glViewport(0, 0, width, height);
    glClearColor(0.1f, 0.15f, 0.1f, 1.0f);
@@ -407,7 +407,7 @@ static void fft_step(glfft_t *fft, const GLshort *audio_buffer, unsigned frames)
    memmove(slide, slide + frames * 2, (fft->sliding_size - 2 * frames) * sizeof(GLshort));
    memcpy(slide + fft->sliding_size - frames * 2, audio_buffer, 2 * frames * sizeof(GLshort));
 
-   // Upload audio data to GPU.
+   /* Upload audio data to GPU. */
    glBindBuffer(GL_PIXEL_UNPACK_BUFFER, fft->pbo);
 
    buffer = (GLshort*)(glMapBufferRange(GL_PIXEL_UNPACK_BUFFER, 0,
@@ -421,7 +421,7 @@ static void fft_step(glfft_t *fft, const GLshort *audio_buffer, unsigned frames)
    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, fft->size, 1, GL_RG_INTEGER, GL_SHORT, NULL);
    glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
 
-   // Perform FFT of new block.
+   /* Perform FFT of new block. */
    glViewport(0, 0, fft->size, 1);
 
    for (i = 0; i < fft->steps; i++)
@@ -452,7 +452,7 @@ static void fft_step(glfft_t *fft, const GLshort *audio_buffer, unsigned frames)
    }
    glActiveTexture(GL_TEXTURE0);
 
-   // Resolve new chunk to heightmap.
+   /* Resolve new chunk to heightmap. */
    glViewport(0, fft->output_ptr, fft->size, 1);
    glUseProgram(fft->prog_resolve);
    glBindFramebuffer(GL_FRAMEBUFFER, fft->resolve.fbo);
@@ -461,14 +461,14 @@ static void fft_step(glfft_t *fft, const GLshort *audio_buffer, unsigned frames)
    glBindTexture(GL_TEXTURE_2D, fft->output.tex);
    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
-   // Re-blur damaged regions of heightmap.
+   /* Re-blur damaged regions of heightmap. */
    glUseProgram(fft->prog_blur);
    glBindTexture(GL_TEXTURE_2D, fft->resolve.tex);
    glBindFramebuffer(GL_FRAMEBUFFER, fft->blur.fbo);
    glUniform4fv(glGetUniformLocation(fft->prog_blur, "uOffsetScale"), 1, resolve_offset);
    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
-   // Mipmap the heightmap.
+   /* Mipmap the heightmap. */
    glBindTexture(GL_TEXTURE_2D, fft->blur.tex);
    glGenerateMipmap(GL_TEXTURE_2D);
    glBindTexture(GL_TEXTURE_2D, 0);
