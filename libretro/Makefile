@@ -135,6 +135,7 @@ HAVE_PTHREADS = 1
 	HAVE_GETADDRINFO = 1
 	HAVE_NETWORK = 1
 	HAVE_SOCKLEN = 1
+	HAVE_PTHREADS = 1
 
    LIBS = $(shell pkg-config libass --libs) -lpthread
    CFLAGS += $(shell pkg-config libass --cflags) -lpthread
