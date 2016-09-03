@@ -1761,6 +1761,7 @@ AVCODEC_BLACKLIST += \
 							$(AVCODEC_DIR)/vaapi_h264.c \
 							$(AVCODEC_DIR)/vaapi_mpeg.c \
 							$(AVCODEC_DIR)/vaapi_mpeg2.c \
+							$(AVCODEC_DIR)/vaapi_mpeg4.c \
 							$(AVCODEC_DIR)/vaapi_vc1.c \
 							$(AVCODEC_DIR)/vaapi.c
 endif
