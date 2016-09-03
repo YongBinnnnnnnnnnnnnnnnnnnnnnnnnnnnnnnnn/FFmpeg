@@ -1529,6 +1529,7 @@ AVCODEC_BLACKLIST := \
 ifeq ($(HAVE_LIBGSM),1)
 else
 	AVCODEC_BLACKLIST += $(AVCODEC_DIR)/libgsm.c \
+								$(AVCODEC_DIR)/libgsmdec.c \
 								$(AVCODEC_DIR)/libgsmenc.c
 endif
 
