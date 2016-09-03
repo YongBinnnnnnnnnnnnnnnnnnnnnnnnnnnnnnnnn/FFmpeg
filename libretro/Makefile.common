@@ -2,7 +2,7 @@ LIBAVCODEC_SOURCE  :=
 LIBAVFORMAT_SOURCE :=
 LIBAVUTIL_SOURCE   :=
 DEPS_SOURCE        :=
-DEFINES            := -DHAVE_GMTIME_R -DHAVE_LOCALTIME_R
+DEFINES            := -DHAVE_GMTIME_R -DHAVE_LOCALTIME_R -DHAVE_SWRESAMPLE
 LIBRETRO_SOURCE    := 
 
 DEPS_DIR           := $(CORE_DIR)/deps
@@ -17,8 +17,8 @@ SWRESAMPLE_DIR 	 := $(BASE_DIR)/libswresample
 
 INCFLAGS           := -I$(CORE_DIR) -I$(LIBRETRO_COMM_DIR)/include
 
-LIBRETRO_SOURCE    += $(CORE_DIR)/libretro.c \
-							 $(LIBRETRO_COMM_DIR)/queues/fifo_buffer.c \
+LIBRETRO_SOURCE    += $(CORE_DIR)/ffmpeg_core.c \
+							 $(LIBRETRO_COMM_DIR)/queues/fifo_queue.c \
 							 $(LIBRETRO_COMM_DIR)/rthreads/rthreads.c \
 							 $(LIBRETRO_COMM_DIR)/glsym/rglgen.c
 
@@ -1924,6 +1924,7 @@ ifeq ($(HAVE_GL_FFT), 1)
    ifeq ($(GLES), 1)
       DEFINES += -DHAVE_OPENGLES3
    endif
+	INCFLAGS   += -I$(CORE_DIR)/fft
    FFT_SOURCE += $(CORE_DIR)/fft/fft.cpp
 endif
 

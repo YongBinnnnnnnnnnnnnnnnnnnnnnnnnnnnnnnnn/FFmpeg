@@ -5,6 +5,12 @@
 #include <assert.h>
 #include <stdarg.h>
 
+#ifdef RARCH_INTERNAL
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -12,10 +18,14 @@ extern "C" {
 #include <libavformat/avformat.h>
 #include <libavcodec/avcodec.h>
 #include <libswscale/swscale.h>
+#include <libavutil/imgutils.h>
 #include <libavutil/time.h>
 #include <libavutil/opt.h>
 #include <libavdevice/avdevice.h>
+#ifdef HAVE_SWRESAMPLE
 #include <libswresample/swresample.h>
+#endif
+
 #ifdef HAVE_SSA
 #include <ass/ass.h>
 #endif
@@ -28,14 +38,14 @@ extern "C" {
 #include "fft/fft.h"
 #endif
 
-#ifdef HAVE_OPENGL
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
 #include <glsym/glsym.h>
 #endif
 
 #include <rthreads/rthreads.h>
-#include <queues/fifo_buffer.h>
+#include <queues/fifo_queue.h>
 
-#include "libretro.h"
+#include <libretro.h>
 #ifdef RARCH_INTERNAL
 #include "internal_cores.h"
 #define CORE_PREFIX(s) libretro_ffmpeg_##s
@@ -138,7 +148,7 @@ static double seek_time;
 /* GL stuff */
 struct frame
 {
-#if defined(HAVE_OPENGL)
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
    GLuint tex;
 #if !defined(HAVE_OPENGLES)
    GLuint pbo;
@@ -149,7 +159,7 @@ struct frame
 
 static struct frame frames[2];
 
-#ifdef HAVE_OPENGL
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
 static bool temporal_interpolation;
 static bool use_gl;
 static struct retro_hw_render_callback hw_render;
@@ -174,9 +184,14 @@ static struct
 #ifdef HAVE_SSA
 static void ass_msg_cb(int level, const char *fmt, va_list args, void *data)
 {
+   char buffer[4096];
    (void)data;
+
    if (level < 6)
-      log_cb(RETRO_LOG_INFO, fmt);
+   {
+      vsnprintf(buffer, sizeof(buffer), fmt, args);
+      log_cb(RETRO_LOG_INFO, "%s\n", buffer);
+   }
 }
 #endif
 
@@ -255,7 +270,7 @@ void CORE_PREFIX(retro_get_system_av_info)(struct retro_system_av_info *info)
 void CORE_PREFIX(retro_set_environment)(retro_environment_t cb)
 {
    static const struct retro_variable vars[] = {
-#ifdef HAVE_OPENGL
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
       { "ffmpeg_temporal_interp", "Temporal Interpolation; enabled|disabled" },
 #endif
 #ifdef HAVE_GL_FFT
@@ -310,7 +325,7 @@ void CORE_PREFIX(retro_reset)(void)
 static void check_variables(void)
 {
    struct retro_variable color_var  = {0};
-#ifdef HAVE_OPENGL
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
    struct retro_variable var        = {0};
 #endif
 #ifdef HAVE_GL_FFT
@@ -318,7 +333,7 @@ static void check_variables(void)
    struct retro_variable fft_ms_var = {0};
 #endif
 
-#ifdef HAVE_OPENGL
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
    var.key = "ffmpeg_temporal_interp";
 
    if (CORE_PREFIX(environ_cb)(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
@@ -609,37 +624,39 @@ void CORE_PREFIX(retro_run)(void)
 
          if (!decode_thread_dead)
          {
+            uint32_t *data = video_frame_temp_buffer;
             fifo_read(video_decode_fifo, &pts, sizeof(int64_t));
-#if defined(HAVE_OPENGL)
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
             if (use_gl)
             {
-#if defined(HAVE_OPENGLES)
-               fifo_read(video_decode_fifo, video_frame_temp_buffer, media.width * media.height * sizeof(uint32_t));
-               glBindTexture(GL_TEXTURE_2D, frames[1].tex);
-               glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA,
-                     media.width, media.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, video_frame_temp_buffer);
-               glBindTexture(GL_TEXTURE_2D, 0);
-#else
-               uint32_t *data = NULL;
+#ifndef HAVE_OPENGLES
                glBindBuffer(GL_PIXEL_UNPACK_BUFFER, frames[1].pbo);
-
                data = (uint32_t*)glMapBufferRange(GL_PIXEL_UNPACK_BUFFER,
                      0, media.width * media.height, GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT);
-               
+#endif
+
                fifo_read(video_decode_fifo, data, media.width * media.height * sizeof(uint32_t));
-               
+
+#ifndef HAVE_OPENGLES
                glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
+#endif
                glBindTexture(GL_TEXTURE_2D, frames[1].tex);
+#if defined(HAVE_OPENGLES)
+               glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA,
+                     media.width, media.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+#else
                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA,
                      media.width, media.height, 0, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, NULL);
+#endif
                glBindTexture(GL_TEXTURE_2D, 0);
+#ifndef HAVE_OPENGLES
                glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
 #endif
             }
             else
 #endif
             {
-               fifo_read(video_decode_fifo, video_frame_temp_buffer, media.width * media.height * sizeof(uint32_t));
+               fifo_read(video_decode_fifo, data, media.width * media.height * sizeof(uint32_t));
                dupe = false;
             }
          }
@@ -650,7 +667,7 @@ void CORE_PREFIX(retro_run)(void)
          frames[1].pts = av_q2d(fctx->streams[video_stream]->time_base) * pts;
       }
 
-#ifdef HAVE_OPENGL
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
       if (use_gl)
       {
          float mix_factor = (min_pts - frames[0].pts) / (frames[1].pts - frames[0].pts);
@@ -690,12 +707,14 @@ void CORE_PREFIX(retro_run)(void)
          glActiveTexture(GL_TEXTURE0);
          glBindTexture(GL_TEXTURE_2D, 0);
          
-         CORE_PREFIX(video_cb)(RETRO_HW_FRAME_BUFFER_VALID, media.width, media.height, media.width * sizeof(uint32_t));
+         CORE_PREFIX(video_cb)(RETRO_HW_FRAME_BUFFER_VALID,
+               media.width, media.height, media.width * sizeof(uint32_t));
       }
       else
 #endif
       {
-         CORE_PREFIX(video_cb)(dupe ? NULL : video_frame_temp_buffer, media.width, media.height, media.width * sizeof(uint32_t));
+         CORE_PREFIX(video_cb)(dupe ? NULL : video_frame_temp_buffer,
+               media.width, media.height, media.width * sizeof(uint32_t));
       }
    }
 #ifdef HAVE_GL_FFT
@@ -718,7 +737,8 @@ void CORE_PREFIX(retro_run)(void)
          frames -= to_read;
       }
       glfft_render(fft, hw_render.get_current_framebuffer(), fft_width, fft_height);
-      CORE_PREFIX(video_cb)(RETRO_HW_FRAME_BUFFER_VALID, fft_width, fft_height, fft_width * sizeof(uint32_t));
+      CORE_PREFIX(video_cb)(RETRO_HW_FRAME_BUFFER_VALID,
+            fft_width, fft_height, fft_width * sizeof(uint32_t));
    }
 #endif
    else
@@ -759,8 +779,10 @@ static bool codec_is_image(enum AVCodecID id)
          return true;
 
       default:
-         return false;
+         break;
    }
+
+   return false;
 }
 
 static bool codec_id_is_ttf(enum AVCodecID id)
@@ -775,8 +797,10 @@ static bool codec_id_is_ttf(enum AVCodecID id)
          return true;
 
       default:
-       return false;
+         break;
    }
+
+   return false;
 }
 
 #ifdef HAVE_SSA
@@ -792,8 +816,10 @@ static bool codec_id_is_ass(enum AVCodecID id)
 #endif
          return true;
       default:
-         return false;
+         break;
    }
+
+   return false;
 }
 #endif
 
@@ -801,13 +827,19 @@ static bool open_codecs(void)
 {
    unsigned i;
 
-   video_stream = -1;
+   decode_thread_lock   = slock_new();
+
+   video_stream         = -1;
+   audio_streams_num    = 0;
+   subtitle_streams_num = 0;
+
+   slock_lock(decode_thread_lock);
+   audio_streams_ptr    = 0;
+   subtitle_streams_ptr = 0;
+   slock_unlock(decode_thread_lock);
+
    memset(audio_streams,    0, sizeof(audio_streams));
    memset(subtitle_streams, 0, sizeof(subtitle_streams));
-   audio_streams_num    = 0;
-   audio_streams_ptr    = 0;
-   subtitle_streams_num = 0;
-   subtitle_streams_ptr = 0;
 
    for (i = 0; i < fctx->nb_streams; i++)
    {
@@ -824,7 +856,8 @@ static bool open_codecs(void)
             break;
 
          case AVMEDIA_TYPE_VIDEO:
-            if (!vctx && !codec_is_image(fctx->streams[i]->codec->codec_id))
+            if (     !vctx 
+                  && !codec_is_image(fctx->streams[i]->codec->codec_id))
             {
                if (!open_codec(&vctx, i))
                   return false;
@@ -834,7 +867,8 @@ static bool open_codecs(void)
 
          case AVMEDIA_TYPE_SUBTITLE:
 #ifdef HAVE_SSA
-            if (subtitle_streams_num < MAX_STREAMS && codec_id_is_ass(fctx->streams[i]->codec->codec_id))
+            if (     subtitle_streams_num < MAX_STREAMS 
+                  && codec_id_is_ass(fctx->streams[i]->codec->codec_id))
             {
                int size;
                AVCodecContext **s = &sctx[subtitle_streams_num];
@@ -848,7 +882,7 @@ static bool open_codecs(void)
 
                if (size)
                {
-                  ass_extra_data[subtitle_streams_num] = av_malloc(size);
+                  ass_extra_data[subtitle_streams_num] = (uint8_t*)av_malloc(size);
                   memcpy(ass_extra_data[subtitle_streams_num], (*s)->extradata, size);
                }
 
@@ -858,12 +892,12 @@ static bool open_codecs(void)
             break;
 
          case AVMEDIA_TYPE_ATTACHMENT:
-         {
-            AVCodecContext *ctx = fctx->streams[i]->codec;
-            if (codec_id_is_ttf(ctx->codec_id))
-               append_attachment(ctx->extradata, ctx->extradata_size);
+            {
+               AVCodecContext *ctx = fctx->streams[i]->codec;
+               if (codec_id_is_ttf(ctx->codec_id))
+                  append_attachment(ctx->extradata, ctx->extradata_size);
+            }
             break;
-         }
 
          default:
             break;
@@ -879,23 +913,26 @@ static bool init_media_info(void)
       media.sample_rate = actx[0]->sample_rate;
 
    media.interpolate_fps = 60.0;
+
    if (vctx)
    {
       media.width  = vctx->width;
       media.height = vctx->height;
-      media.aspect = (float)vctx->width * av_q2d(vctx->sample_aspect_ratio) / vctx->height;
+      media.aspect = (float)vctx->width * 
+         av_q2d(vctx->sample_aspect_ratio) / vctx->height;
    }
 
 #ifdef HAVE_SSA
    if (sctx[0])
    {
-      size_t i;
+      unsigned i;
 
       ass = ass_library_init();
       ass_set_message_cb(ass, ass_msg_cb, NULL);
 
       for (i = 0; i < attachments_size; i++)
-         ass_add_font(ass, (char*)"", (char*)attachments[i].data, attachments[i].size);
+         ass_add_font(ass, (char*)"",
+               (char*)attachments[i].data, attachments[i].size);
 
       ass_render = ass_renderer_init(ass);
       ass_set_frame_size(ass_render, media.width, media.height);
@@ -903,7 +940,7 @@ static bool init_media_info(void)
       ass_set_fonts(ass_render, NULL, NULL, 1, NULL, 1);
       ass_set_hinting(ass_render, ASS_HINTING_LIGHT);
 
-      for (i = 0; i < subtitle_streams_num; i++)
+      for (i = 0; i < (unsigned)subtitle_streams_num; i++)
       {
          ass_track[i] = ass_new_track(ass);
          ass_process_codec_private(ass_track[i], (char*)ass_extra_data[i],
@@ -916,7 +953,8 @@ static bool init_media_info(void)
 }
 
 static void set_colorspace(struct SwsContext *sws,
-      unsigned width, unsigned height, enum AVColorSpace default_color, int in_range)
+      unsigned width, unsigned height,
+      enum AVColorSpace default_color, int in_range)
 {
    const int *coeffs = NULL;
 
@@ -951,7 +989,8 @@ static void set_colorspace(struct SwsContext *sws,
    }
 }
 
-static bool decode_video(AVPacket *pkt, AVFrame *frame, AVFrame *conv, struct SwsContext *sws)
+static bool decode_video(AVPacket *pkt, AVFrame *frame,
+      AVFrame *conv, struct SwsContext *sws)
 {
    int got_ptr = 0;
    int ret     = avcodec_decode_video2(vctx, frame, &got_ptr, pkt);
@@ -963,7 +1002,8 @@ static bool decode_video(AVPacket *pkt, AVFrame *frame, AVFrame *conv, struct Sw
    {
       set_colorspace(sws, media.width, media.height,
             av_frame_get_colorspace(frame), av_frame_get_color_range(frame));
-      sws_scale(sws, (const uint8_t * const*)frame->data, frame->linesize, 0, media.height,
+      sws_scale(sws, (const uint8_t * const*)frame->data,
+            frame->linesize, 0, media.height,
             conv->data, conv->linesize);
       return true;
    }
@@ -971,7 +1011,8 @@ static bool decode_video(AVPacket *pkt, AVFrame *frame, AVFrame *conv, struct Sw
    return false;
 }
 
-static int16_t *decode_audio(AVCodecContext *ctx, AVPacket *pkt, AVFrame *frame, int16_t *buffer, size_t *buffer_cap,
+static int16_t *decode_audio(AVCodecContext *ctx, AVPacket *pkt,
+      AVFrame *frame, int16_t *buffer, size_t *buffer_cap,
       SwrContext *swr)
 {
    AVPacket pkt_tmp = *pkt;
@@ -981,8 +1022,8 @@ static int16_t *decode_audio(AVCodecContext *ctx, AVPacket *pkt, AVFrame *frame,
    {
       int64_t pts;
       size_t required_buffer;
-
       int ret = avcodec_decode_audio4(ctx, frame, &got_ptr, &pkt_tmp);
+
       if (ret < 0)
          return buffer;
 
@@ -1020,7 +1061,9 @@ static int16_t *decode_audio(AVCodecContext *ctx, AVPacket *pkt, AVFrame *frame,
          }
       }
 
-      decode_last_audio_time = pts * av_q2d(fctx->streams[audio_streams[audio_streams_ptr]]->time_base);
+      decode_last_audio_time = pts * av_q2d(
+            fctx->streams[audio_streams[audio_streams_ptr]]->time_base);
+
       if (!decode_thread_dead)
          fifo_write(audio_decode_fifo, buffer, required_buffer);
 
@@ -1069,20 +1112,20 @@ static void render_ass_img(AVFrame *conv_frame, ASS_Image *img)
    for (; img; img = img->next)
    {
       int x, y;
-      uint32_t *dst;
       unsigned r, g, b, a;
+      uint32_t *dst         = NULL;
       const uint8_t *bitmap = NULL;
 
       if (img->w == 0 && img->h == 0)
          continue;
 
       bitmap = img->bitmap;
-      dst = frame + img->dst_x + img->dst_y * stride;
+      dst    = frame + img->dst_x + img->dst_y * stride;
 
-      r = (img->color >> 24) & 0xff;
-      g = (img->color >> 16) & 0xff;
-      b = (img->color >>  8) & 0xff;
-      a = 255 - (img->color & 0xff);
+      r      = (img->color >> 24) & 0xff;
+      g      = (img->color >> 16) & 0xff;
+      b      = (img->color >>  8) & 0xff;
+      a      = 255 - (img->color & 0xff);
 
       for (y = 0; y < img->h; y++,
             bitmap += img->stride, dst += stride)
@@ -1093,15 +1136,16 @@ static void render_ass_img(AVFrame *conv_frame, ASS_Image *img)
             unsigned dst_alpha = 256 - src_alpha;
 
             uint32_t dst_color = dst[x];
-            unsigned dst_r = (dst_color >> 16) & 0xff;
-            unsigned dst_g = (dst_color >>  8) & 0xff;
-            unsigned dst_b = (dst_color >>  0) & 0xff;
+            unsigned dst_r     = (dst_color >> 16) & 0xff;
+            unsigned dst_g     = (dst_color >>  8) & 0xff;
+            unsigned dst_b     = (dst_color >>  0) & 0xff;
 
             dst_r = (r * src_alpha + dst_r * dst_alpha) >> 8;
             dst_g = (g * src_alpha + dst_g * dst_alpha) >> 8;
             dst_b = (b * src_alpha + dst_b * dst_alpha) >> 8;
 
-            dst[x] = (0xffu << 24) | (dst_r << 16) | (dst_g << 8) | (dst_b << 0);
+            dst[x] = (0xffu << 24) | (dst_r << 16) | 
+               (dst_g << 8) | (dst_b << 0);
          }
       }
    }
@@ -1111,8 +1155,9 @@ static void render_ass_img(AVFrame *conv_frame, ASS_Image *img)
 static void decode_thread(void *data)
 {
    unsigned i;
-   AVFrame *aud_frame, *vid_frame;
    SwrContext *swr[audio_streams_num];
+   AVFrame *aud_frame      = NULL;
+   AVFrame *vid_frame      = NULL;
    void *conv_frame_buf    = NULL;
    size_t frame_size       = 0;
    int16_t *audio_buffer   = NULL;
@@ -1158,18 +1203,18 @@ static void decode_thread(void *data)
    while (!decode_thread_dead)
    {
       bool seek;
+      AVPacket pkt;
+      int subtitle_stream;
       double seek_time_thread;
       int audio_stream, audio_stream_ptr;
-      int subtitle_stream;
-      AVPacket pkt;
-      AVCodecContext *actx_active;
-      AVCodecContext *sctx_active;
+      AVCodecContext *actx_active = NULL;
+      AVCodecContext *sctx_active = NULL;
 #ifdef HAVE_SSA
-      ASS_Track *ass_track_active;
+      ASS_Track *ass_track_active = NULL;
 #endif
 
       slock_lock(fifo_lock);
-      seek = do_seek;
+      seek             = do_seek;
       seek_time_thread = seek_time;
       slock_unlock(fifo_lock);
 
@@ -1216,7 +1261,7 @@ static void decode_thread(void *data)
 #ifdef HAVE_SSA
             if (ass_render)
             {
-               int change = 0;
+               int change     = 0;
                ASS_Image *img = ass_render_frame(ass_render, ass_track_active,
                      1000 * video_time, &change);
 
@@ -1229,7 +1274,7 @@ static void decode_thread(void *data)
             decoded_size = frame_size + sizeof(pts);
             slock_lock(fifo_lock);
 
-            while (!decode_thread_dead 
+            while (!decode_thread_dead  && (video_decode_fifo != NULL)
                   && fifo_write_avail(video_decode_fifo) < decoded_size)
             {
                if (!main_sleeping)
@@ -1285,7 +1330,8 @@ static void decode_thread(void *data)
          for (i = 0; i < sub.num_rects; i++)
          {
             if (sub.rects[i]->ass)
-               ass_process_data(ass_track_active, sub.rects[i]->ass, strlen(sub.rects[i]->ass));
+               ass_process_data(ass_track_active,
+                     sub.rects[i]->ass, strlen(sub.rects[i]->ass));
          }
 #endif
 
@@ -1314,7 +1360,7 @@ static void decode_thread(void *data)
    slock_unlock(fifo_lock);
 }
 
-#ifdef HAVE_OPENGL
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
 static void context_destroy(void)
 {
 #ifdef HAVE_GL_FFT
@@ -1326,29 +1372,19 @@ static void context_destroy(void)
 #endif
 }
 
-static void context_reset(void)
-{
-   static const char *vertex_source =
-      "attribute vec2 aVertex;\n"
-      "attribute vec2 aTexCoord;\n"
-      "varying vec2 vTex;\n"
-      "void main() { gl_Position = vec4(aVertex, 0.0, 1.0); vTex = aTexCoord; }\n";
+#include "gl_shaders/ffmpeg.glsl.vert.h"
 
-   static const char *fragment_source =
-      "#ifdef GL_ES\n"
-      "precision mediump float;\n"
-      "#endif\n"
-      "varying vec2 vTex;\n"
-      "uniform sampler2D sTex0;\n"
-      "uniform sampler2D sTex1;\n"
-      "uniform float uMix;\n"
-#if defined(HAVE_OPENGLES)
-      "void main() { gl_FragColor = vec4(pow(mix(pow(texture2D(sTex0, vTex).bgr, vec3(2.2)), pow(texture2D(sTex1, vTex).bgr, vec3(2.2)), uMix), vec3(1.0 / 2.2)), 1.0); }\n";
-      // Get format as GL_RGBA/GL_UNSIGNED_BYTE. Assume little endian, so we get ARGB -> BGRA byte order, and we have to swizzle to .BGR.
+/* OpenGL ES note about main() -  Get format as GL_RGBA/GL_UNSIGNED_BYTE. 
+ * Assume little endian, so we get ARGB -> BGRA byte order, and 
+ * we have to swizzle to .BGR. */
+#ifdef HAVE_OPENGLES
+#include "gl_shaders/ffmpeg_es.glsl.frag.h"
 #else
-      "void main() { gl_FragColor = vec4(pow(mix(pow(texture2D(sTex0, vTex).rgb, vec3(2.2)), pow(texture2D(sTex1, vTex).rgb, vec3(2.2)), uMix), vec3(1.0 / 2.2)), 1.0); }\n";
+#include "gl_shaders/ffmpeg.glsl.frag.h"
 #endif
 
+static void context_reset(void)
+{
    static const GLfloat vertex_data[] = {
       -1, -1, 0, 0,
        1, -1, 1, 0,
@@ -1406,14 +1442,16 @@ static void context_reset(void)
 #if !defined(HAVE_OPENGLES)
       glGenBuffers(1, &frames[i].pbo);
       glBindBuffer(GL_PIXEL_UNPACK_BUFFER, frames[i].pbo);
-      glBufferData(GL_PIXEL_UNPACK_BUFFER, media.width * media.height * sizeof(uint32_t), NULL, GL_STREAM_DRAW);
+      glBufferData(GL_PIXEL_UNPACK_BUFFER, media.width 
+            * media.height * sizeof(uint32_t), NULL, GL_STREAM_DRAW);
       glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
 #endif
    }
 
    glGenBuffers(1, &vbo);
    glBindBuffer(GL_ARRAY_BUFFER, vbo);
-   glBufferData(GL_ARRAY_BUFFER, sizeof(vertex_data), vertex_data, GL_STATIC_DRAW);
+   glBufferData(GL_ARRAY_BUFFER,
+         sizeof(vertex_data), vertex_data, GL_STATIC_DRAW);
 
    glBindBuffer(GL_ARRAY_BUFFER, 0);
    glBindTexture(GL_TEXTURE_2D, 0);
@@ -1561,17 +1599,16 @@ bool CORE_PREFIX(retro_load_game)(const struct retro_game_info *info)
       goto error;
    }
 
-   decode_thread_dead = false;
-
 #ifdef HAVE_GL_FFT
    is_glfft = video_stream < 0 && audio_streams_num > 0;
 #endif
 
    if (video_stream >= 0 || is_glfft)
    {
-      video_decode_fifo = fifo_new(media.width * media.height * sizeof(uint32_t) * 32);
+      video_decode_fifo = fifo_new(media.width 
+            * media.height * sizeof(uint32_t) * 32);
 
-#ifdef HAVE_OPENGL
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
       use_gl = true;
       hw_render.context_reset = context_reset;
       hw_render.context_destroy = context_destroy;
@@ -1585,7 +1622,7 @@ bool CORE_PREFIX(retro_load_game)(const struct retro_game_info *info)
 #endif
       if (!CORE_PREFIX(environ_cb)(RETRO_ENVIRONMENT_SET_HW_RENDER, &hw_render))
       {
-         use_gl=false;
+         use_gl = false;
          LOG_ERR("Cannot initialize HW render.");
       }
 #endif
@@ -1596,10 +1633,13 @@ bool CORE_PREFIX(retro_load_game)(const struct retro_game_info *info)
       audio_decode_fifo = fifo_new(buffer_seconds * media.sample_rate * sizeof(int16_t) * 2);
    }
 
-   fifo_cond = scond_new();
+   fifo_cond        = scond_new();
    fifo_decode_cond = scond_new();
-   fifo_lock = slock_new();
-   decode_thread_lock = slock_new();
+   fifo_lock        = slock_new();
+
+   slock_lock(fifo_lock);
+   decode_thread_dead = false;
+   slock_unlock(fifo_lock);
 
    check_variables();
 
@@ -1671,13 +1711,3 @@ void CORE_PREFIX(retro_cheat_set)(unsigned index, bool enabled, const char *code
    (void)enabled;
    (void)code;
 }
-
-#if defined(LIBRETRO_SWITCH)
-
-#ifdef ARCH_X86
-#include "../libswresample/resample.h"
-void swri_resample_dsp_init(ResampleContext *c)
-{}
-#endif
-
-#endif

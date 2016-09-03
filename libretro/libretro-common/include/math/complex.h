@@ -1,7 +1,7 @@
-/* Copyright  (C) 2010-2015 The RetroArch team
+/* Copyright  (C) 2010-2016 The RetroArch team
  *
  * ---------------------------------------------------------------------------------------
- * The following license statement only applies to this file (boolean.h).
+ * The following license statement only applies to this file (complex.h).
  * ---------------------------------------------------------------------------------------
  *
  * Permission is hereby granted, free of charge,
@@ -19,44 +19,62 @@
  * WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
-
-#ifndef __LIBRETRO_SDK_FIFO_BUFFER_H
-#define __LIBRETRO_SDK_FIFO_BUFFER_H
+#ifndef __LIBRETRO_SDK_MATH_COMPLEX_H__
+#define __LIBRETRO_SDK_MATH_COMPLEX_H__
 
 #include <stdint.h>
-#include <stddef.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include <retro_inline.h>
 
-struct fifo_buffer
+typedef struct
 {
-   uint8_t *buffer;
-   size_t bufsize;
-   size_t first;
-   size_t end;
-};
+   float real;
+   float imag;
+} fft_complex_t;
 
-typedef struct fifo_buffer fifo_buffer_t;
+static INLINE fft_complex_t fft_complex_mul(fft_complex_t a,
+      fft_complex_t b)
+{
+   fft_complex_t out = {
+      a.real * b.real - a.imag * b.imag,
+      a.imag * b.real + a.real * b.imag,
+   };
 
-fifo_buffer_t *fifo_new(size_t size);
+   return out;
 
-void fifo_clear(fifo_buffer_t *buffer);
-
-void fifo_write(fifo_buffer_t *buffer, const void *in_buf, size_t size);
-
-void fifo_read(fifo_buffer_t *buffer, void *in_buf, size_t size);
-
-void fifo_free(fifo_buffer_t *buffer);
-
-size_t fifo_read_avail(fifo_buffer_t *buffer);
-
-size_t fifo_write_avail(fifo_buffer_t *buffer);
-
-#ifdef __cplusplus
 }
-#endif
+
+static INLINE fft_complex_t fft_complex_add(fft_complex_t a,
+      fft_complex_t b)
+{
+   fft_complex_t out = {
+      a.real + b.real,
+      a.imag + b.imag,
+   };
+
+   return out;
+
+}
+
+static INLINE fft_complex_t fft_complex_sub(fft_complex_t a,
+      fft_complex_t b)
+{
+   fft_complex_t out = {
+      a.real - b.real,
+      a.imag - b.imag,
+   };
+
+   return out;
+
+}
+
+static INLINE fft_complex_t fft_complex_conj(fft_complex_t a)
+{
+   fft_complex_t out = {
+      a.real, -a.imag,
+   };
+
+   return out;
+}
 
 #endif
-

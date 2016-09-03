@@ -1,7 +1,7 @@
 /* Copyright  (C) 2010-2016 The RetroArch team
  *
  * ---------------------------------------------------------------------------------------
- * The following license statement only applies to this file (boolean.h).
+ * The following license statement only applies to this file (fxp.h).
  * ---------------------------------------------------------------------------------------
  *
  * Permission is hereby granted, free of charge,
@@ -20,20 +20,43 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef __LIBRETRO_SDK_BOOLEAN_H
-#define __LIBRETRO_SDK_BOOLEAN_H
+#ifndef __LIBRETRO_SDK_MATH_FXP_H__
+#define __LIBRETRO_SDK_MATH_FXP_H__
 
-#ifndef __cplusplus
+#include <stdint.h>
 
-#if defined(_MSC_VER) && !defined(SN_TARGET_PS3)
-/* Hack applied for MSVC when compiling in C89 mode as it isn't C99 compliant. */
-#define bool unsigned char
-#define true 1
-#define false 0
+#ifdef _MSC_VER
+#include <intrin.h>
+#endif
+
+#include <retro_inline.h>
+
+static INLINE int64_t fx32_mul(const int32_t a, const int32_t b)
+{
+#ifdef _MSC_VER
+   return __emul(a, b);
 #else
-#include <stdbool.h>
+   return ((int64_t)a) * ((int64_t)b);
 #endif
+}
+
+static INLINE int32_t fx32_shiftdown(const int64_t a)
+{
+#ifdef _MSC_VER
+	return (int32_t)__ll_rshift(a, 12);
+#else
+	return (int32_t)(a >> 12);
+#endif
+}
+
+static INLINE int64_t fx32_shiftup(const int32_t a)
+{
+#ifdef _MSC_VER
+	return __ll_lshift(a, 12);
+#else
+	return ((int64_t)a) << 12;
+#endif
+}
 
 #endif
 
-#endif

@@ -1,7 +1,7 @@
 /* Copyright  (C) 2010-2016 The RetroArch team
  *
  * ---------------------------------------------------------------------------------------
- * The following license statement only applies to this file (boolean.h).
+ * The following license statement only applies to this file (fifo_queue.h).
  * ---------------------------------------------------------------------------------------
  *
  * Permission is hereby granted, free of charge,
@@ -20,20 +20,33 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef __LIBRETRO_SDK_BOOLEAN_H
-#define __LIBRETRO_SDK_BOOLEAN_H
+#ifndef __LIBRETRO_SDK_FIFO_BUFFER_H
+#define __LIBRETRO_SDK_FIFO_BUFFER_H
 
-#ifndef __cplusplus
+#include <stdint.h>
+#include <stddef.h>
 
-#if defined(_MSC_VER) && !defined(SN_TARGET_PS3)
-/* Hack applied for MSVC when compiling in C89 mode as it isn't C99 compliant. */
-#define bool unsigned char
-#define true 1
-#define false 0
-#else
-#include <stdbool.h>
+#include <retro_common_api.h>
+
+RETRO_BEGIN_DECLS
+
+typedef struct fifo_buffer fifo_buffer_t;
+
+fifo_buffer_t *fifo_new(size_t size);
+
+void fifo_clear(fifo_buffer_t *buffer);
+
+void fifo_write(fifo_buffer_t *buffer, const void *in_buf, size_t size);
+
+void fifo_read(fifo_buffer_t *buffer, void *in_buf, size_t size);
+
+void fifo_free(fifo_buffer_t *buffer);
+
+size_t fifo_read_avail(fifo_buffer_t *buffer);
+
+size_t fifo_write_avail(fifo_buffer_t *buffer);
+
+RETRO_END_DECLS
+
 #endif
 
-#endif
-
-#endif
