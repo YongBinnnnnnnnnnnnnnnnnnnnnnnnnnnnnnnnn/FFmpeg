@@ -148,6 +148,7 @@ endif
 
 ifeq ($(INTERNAL_XVIDCORE),0)
    LIBS += -lxvidcore
+	HAVE_XVID = 1
 endif
 
 ifeq ($(INTERNAL_LIBTHEORA),0)
@@ -1543,6 +1544,11 @@ else
 	AVCODEC_BLACKLIST += $(AVCODEC_DIR)/libvpxenc.c \
 								$(AVCODEC_DIR)/libvpxdec.c \
 								$(AVCODEC_DIR)/libvpx.c
+endif
+
+ifeq ($(HAVE_XVID),1)
+else
+	AVCODEC_BLACKLIST += $(AVCODEC_DIR)/libxvid.c
 endif
 
 ifeq ($(HAVE_MMAL),1)
