@@ -1,5 +1,3 @@
-HAVE_FIXED         = 1
-
 LIBAVCODEC_SOURCE  :=
 LIBAVFORMAT_SOURCE :=
 LIBAVUTIL_SOURCE   :=
@@ -76,7 +74,7 @@ else
 	INCFLAGS += -I$(DEPS_DIR)/libvorbis
 	DEFINES += -DOV_EXCLUDE_STATIC_CALLBACKS
 	HAVE_LIBVORBIS = 1
-	DEPS_SOURCE += $(wildcard $(DEPS_DIR)/libvorbis/*.c)
+	DEPS_SOURCE += $(wildcard $(DEPS_DIR)/libvorbis/libs/*.c)
 endif
 
 ifeq ($(INTERNAL_LIBLAME),0)
@@ -94,8 +92,8 @@ ifeq ($(INTERNAL_LIBSPEEX),0)
 endif
 
 ifeq ($(INTERNAL_WEBP),0)
-	LIBS += -lwebp
-	HAVE_LIBWEBP = 1
+	#LIBS += -lwebp
+	#HAVE_LIBWEBP = 1
 endif
 
 ifeq ($(INTERNAL_LIBOGG),0)
@@ -391,13 +389,28 @@ else
 DEFINES += -DCONFIG_ZLIB=0 
 endif
 
+ifeq ($(HAVE_LIBDCADEC),1)
+DEFINES += -DCONFIG_LIBDCADEC_DECODER=1
+else
+DEFINES += -DCONFIG_LIBDCADEC_DECODER=0
+endif
+
+ifeq ($(HAVE_TLS),1)
+else
+endif
+
+ifeq ($(HAVE_GNUTLS),1)
+DEFINES += -DCONFIG_TLS_GNUTLS_PROTOCOL=1
+else
+DEFINES += -DCONFIG_TLS_GNUTLS_PROTOCOL=0
+endif
+
 #Protocol flags
 DEFINES +=  \
 			  -DCONFIG_BLURAY_PROTOCOL=0 \
 			  -DCONFIG_ADPCM_THP_LE_DECODER=1 \
 			  -DCONFIG_CCAPTION_DECODER=1 \
 			  -DCONFIG_STL_DECODER=0 \
-			  -DCONFIG_LIBDCADEC_DECODER=0 \
 			  -DCONFIG_CACHE_PROTOCOL=1 \
 			  -DCONFIG_CONCAT_PROTOCOL=1 \
 			  -DCONFIG_CRYPTO_PROTOCOL=1 \
@@ -430,7 +443,6 @@ DEFINES +=  \
 			  -DCONFIG_ASYNC_PROTOCOL=0 \
 			  -DCONFIG_TCP_PROTOCOL=1 \
 			  -DCONFIG_TLS_OPENSSL_PROTOCOL=0 \
-			  -DCONFIG_TLS_GNUTLS_PROTOCOL=0 \
 			  -DCONFIG_TLS_SECURETRANSPORT_PROTOCOL=0 \
 			  -DCONFIG_UDP_PROTOCOL=1 \
 			  -DCONFIG_UDPLITE_PROTOCOL=1 \
@@ -1318,10 +1330,20 @@ AVFORMAT_BLACKLIST := \
 	$(AVFORMAT_DIR)/url-test.c \
 	$(AVFORMAT_DIR)/sctp.c
 
-ifeq ($(HAVE_TLS), 1)
+ifeq ($(HAVE_TLS),1)
 else
 AVFORMAT_BLACKLIST += $(AVFORMAT_DIR)/tls.c \
 							 $(AVFORMAT_DIR)/tls_securetransport.c
+endif
+
+ifeq ($(HAVE_OPENSSL),1)
+else
+AVFORMAT_BLACKLIST += $(AVFORMAT_DIR)/tls_openssl.c
+endif
+
+ifeq ($(HAVE_GNUTLS),1)
+else
+AVFORMAT_BLACKLIST += $(AVFORMAT_DIR)/tls_gnutls.c
 endif
 
 ifneq ($(INTERNAL_LIBAVCODEC),1)
@@ -1387,10 +1409,15 @@ AVCODEC_BLACKLIST := \
 	$(AVCODEC_DIR)/log2_tab.c \
 	$(AVCODEC_DIR)/mpegaudio_tablegen.c \
 	$(AVCODEC_DIR)/cbrt_tablegen.c \
+	$(AVCODEC_DIR)/cbrt_fixed_tablegen.c \
 	$(AVCODEC_DIR)/dsd_tablegen.c \
+	$(AVCODEC_DIR)/aacsbr_fixed_tablegen.c \
+	$(AVCODEC_DIR)/aacpsdsp_template.c \
 	$(AVCODEC_DIR)/aacps_tablegen.c \
+	$(AVCODEC_DIR)/aacps_float.c \
 	$(AVCODEC_DIR)/qdm2_tablegen.c \
 	$(AVCODEC_DIR)/sinewin_tablegen.c \
+	$(AVCODEC_DIR)/sinewin_fixed_tablegen.c \
 	$(AVCODEC_DIR)/pcm_tablegen.c \
 	$(AVCODEC_DIR)/aacpsdata.c \
 	$(AVCODEC_DIR)/mdct_template.c \
@@ -1441,7 +1468,9 @@ endif
 
 ifeq ($(HAVE_VPX),1)
 else
-	AVCODEC_BLACKLIST += $(AVCODEC_DIR)/libvpxenc.c
+	AVCODEC_BLACKLIST += $(AVCODEC_DIR)/libvpxenc.c \
+								$(AVCODEC_DIR)/libvpxdec.c \
+								$(AVCODEC_DIR)/libvpx.c
 endif
 
 ifeq ($(HAVE_MMAL),1)
@@ -1449,12 +1478,19 @@ else
 	AVCODEC_BLACKLIST += $(AVCODEC_DIR)/mmaldec.c
 endif
 
+ifeq ($(HAVE_HAP),1)
+else
+	AVCODEC_BLACKLIST += $(AVCODEC_DIR)/hapenc.c
+endif
+
 ifeq ($(HAVE_LIBTWOLAME),0)
 	AVCODEC_BLACKLIST += $(AVCODEC_DIR)/libtwolame.c
 endif
 
 ifeq ($(HAVE_LIBWEBP),0)
-	AVCODEC_BLACKLIST += $(AVCODEC_DIR)/libwebpenc.c
+	AVCODEC_BLACKLIST += $(AVCODEC_DIR)/libwebpenc.c \
+								$(AVCODEC_DIR)/libwebpenc_common.c \
+								$(AVCODEC_DIR)/libwebpenc_animencoder.c
 endif
 
 ifeq ($(HAVE_LIBFAAC),0)
@@ -1664,6 +1700,11 @@ else
 AVCODEC_BLACKLIST += 	$(AVCODEC_DIR)/nvenc.c
 endif
 
+ifeq ($(HAVE_LIBDCADEC),1)
+else
+AVCODEC_BLACKLIST +=    $(AVCODEC_DIR)/libdcadec.c
+endif
+
 AVCODEC_BLACKLIST +=    $(AVCODEC_DIR)/libwavpackenc.c
 
 AVCODEC_BLACKLIST += $(AVCODEC_DIR)/videotoolbox.c
@@ -1863,7 +1904,6 @@ DEFINES += -DCONFIG_A64_MUXER=1 \
 			 -DCONFIG_W64_MUXER=1 \
 			 -DCONFIG_WAV_MUXER=1 \
 			 -DCONFIG_WEBM_MUXER=1 \
-			 -DCONFIG_WEBM_CHUNK_MIXER=1 \
 			 -DCONFIG_WEBVTT_MUXER=1 \
 			 -DCONFIG_WTV_MUXER=1 \
 			 -DCONFIG_WV_MUXER=1 \
