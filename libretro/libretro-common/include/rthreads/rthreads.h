@@ -23,13 +23,14 @@
 #ifndef __LIBRETRO_SDK_RTHREADS_H__
 #define __LIBRETRO_SDK_RTHREADS_H__
 
+#include <retro_common_api.h>
+
 #include <boolean.h>
 #include <stdint.h>
 #include <retro_inline.h>
+#include <retro_miscellaneous.h>
 
-#if defined(__cplusplus) && !defined(_MSC_VER)
-extern "C" {
-#endif
+RETRO_BEGIN_DECLS
 
 typedef struct sthread sthread_t;
 typedef struct slock slock_t;
@@ -72,6 +73,19 @@ int sthread_detach(sthread_t *thread);
  * Returns: 0 on success, otherwise it returns a non-zero error number.
  */
 void sthread_join(sthread_t *thread);
+
+/**
+ * sthread_isself:
+ * @thread                  : pointer to thread object 
+ *
+ * Join with a terminated thread. Waits for the thread specified by
+ * @thread to terminate. If that thread has already terminated, then
+ * it will return immediately. The thread specified by @thread must
+ * be joinable.
+ * 
+ * Returns: true (1) if calling thread is the specified thread
+ */
+bool sthread_isself(sthread_t *thread);
 
 /**
  * slock_new:
@@ -169,57 +183,6 @@ int scond_broadcast(scond_t *cond);
  **/
 void scond_signal(scond_t *cond);
 
-#ifndef RARCH_INTERNAL
-#if defined(__CELLOS_LV2__) && !defined(__PSL1GHT__)
-#include <sys/timer.h>
-#elif defined(XENON)
-#include <time/time.h>
-#elif defined(GEKKO) || defined(__PSL1GHT__) || defined(__QNX__)
-#include <unistd.h>
-#elif defined(PSP)
-#include <pspthreadman.h>
-#include <psputils.h>
-#elif defined(_3DS)
-#include <3ds.h>
-#elif defined(_WIN32) && !defined(_XBOX)
-#include <windows.h>
-#elif defined(_XBOX)
-#include <xtl.h>
-#else
-#include <time.h>
-#endif
-
-/**
- * retro_sleep:
- * @msec         : amount in milliseconds to sleep
- *
- * Sleeps for a specified amount of milliseconds (@msec).
- **/
-static INLINE void retro_sleep(unsigned msec)
-{
-#if defined(__CELLOS_LV2__) && !defined(__PSL1GHT__)
-   sys_timer_usleep(1000 * msec);
-#elif defined(PSP)
-   sceKernelDelayThread(1000 * msec);
-#elif defined(_3DS)
-   svcSleepThread(1000000 * (s64)msec);
-#elif defined(_WIN32)
-   Sleep(msec);
-#elif defined(XENON)
-   udelay(1000 * msec);
-#elif defined(GEKKO) || defined(__PSL1GHT__) || defined(__QNX__)
-   usleep(1000 * msec);
-#else
-   struct timespec tv = {0};
-   tv.tv_sec = msec / 1000;
-   tv.tv_nsec = (msec % 1000) * 1000000;
-   nanosleep(&tv, NULL);
-#endif
-}
-#endif
-
-#if defined(__cplusplus) && !defined(_MSC_VER)
-}
-#endif
+RETRO_END_DECLS
 
 #endif
