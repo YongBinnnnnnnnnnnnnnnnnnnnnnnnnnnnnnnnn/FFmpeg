@@ -1548,7 +1548,8 @@ endif
 
 ifeq ($(HAVE_XVID),1)
 else
-	AVCODEC_BLACKLIST += $(AVCODEC_DIR)/libxvid.c
+	AVCODEC_BLACKLIST += $(AVCODEC_DIR)/libxvid.c \
+								$(AVCODEC_DIR)/libxvid_rc.c
 endif
 
 ifeq ($(HAVE_MMAL),1)
