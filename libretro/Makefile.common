@@ -163,7 +163,7 @@ endif
 
 endif
 
-LIBS += -lm
+LIBS += -lm -lpthread
 
 DEFINES += -DCONFIG_SMALL=0
 

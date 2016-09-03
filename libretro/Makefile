@@ -176,8 +176,8 @@ ifeq ($(WANT_LIBASS),1)
 
 ifneq (,$(findstring unix,$(platform)))
 ifneq (,$(findstring osx,$(platform)))
-   LIBS = $(shell pkg-config libass --libs) -lpthread
-   CFLAGS += $(shell pkg-config libass --cflags) -lpthread
+   LIBS += $(shell pkg-config libass --libs)
+   CFLAGS += $(shell pkg-config libass --cflags)
 endif
 endif
 
