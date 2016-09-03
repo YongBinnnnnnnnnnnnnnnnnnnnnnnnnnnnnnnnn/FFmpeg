@@ -147,8 +147,8 @@ ifeq ($(INTERNAL_WAVPACK),0)
 endif
 
 ifeq ($(INTERNAL_XVIDCORE),0)
-   LIBS += -lxvidcore
-	HAVE_XVID = 1
+   #LIBS += -lxvidcore
+	#HAVE_XVID = 1
 endif
 
 ifeq ($(INTERNAL_LIBTHEORA),0)
