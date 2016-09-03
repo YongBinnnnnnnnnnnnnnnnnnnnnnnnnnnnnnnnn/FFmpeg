@@ -52,7 +52,7 @@
 #define FLAC__BITS_PER_WORD (8 * FLAC__BYTES_PER_WORD)
 #define FLAC__WORD_ALL_ONES ((FLAC__uint32)0xffffffff)
 /* SWAP_BE_WORD_TO_HOST swaps bytes in a uint32_t (which is always big-endian) if necessary to match host byte order */
-#if WORDS_BIGENDIAN
+#ifdef MSB_FIRST
 #define SWAP_BE_WORD_TO_HOST(x) (x)
 #else
 #define SWAP_BE_WORD_TO_HOST(x) ENDSWAP_32(x)
@@ -153,8 +153,7 @@ FLAC__bool bitreader_read_from_client_(FLAC__BitReader *br)
 	 * on LE machines, have to byteswap the odd tail word so nothing is
 	 * overwritten:
 	 */
-#if WORDS_BIGENDIAN
-#else
+#ifndef MSB_FIRST
 	if(br->bytes)
 		br->buffer[br->words] = SWAP_BE_WORD_TO_HOST(br->buffer[br->words]);
 #endif
@@ -176,8 +175,7 @@ FLAC__bool bitreader_read_from_client_(FLAC__BitReader *br)
 	 *   buffer[LE]:  44 33 22 11 55 66 77 88 99 AA BB CC DD EE FF ??
 	 * now have to byteswap on LE machines:
 	 */
-#if WORDS_BIGENDIAN
-#else
+#ifndef MSB_FIRST
 	end = (br->words*FLAC__BYTES_PER_WORD + br->bytes + bytes + (FLAC__BYTES_PER_WORD-1)) / FLAC__BYTES_PER_WORD;
 	for(start = br->words; start < end; start++)
 		br->buffer[start] = SWAP_BE_WORD_TO_HOST(br->buffer[start]);
