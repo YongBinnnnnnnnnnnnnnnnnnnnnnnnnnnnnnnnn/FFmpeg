@@ -1820,6 +1820,11 @@ else
 AVCODEC_BLACKLIST +=    $(AVCODEC_DIR)/libdcadec.c
 endif
 
+ifeq ($(HAVE_XVMC),1)
+else
+AVCODEC_BLACKLIST +=    $(AVCODEC_DIR)/mpegvideo_xvmc.c
+endif
+
 AVCODEC_BLACKLIST +=    $(AVCODEC_DIR)/libwavpackenc.c
 
 AVCODEC_BLACKLIST += $(AVCODEC_DIR)/videotoolbox.c
