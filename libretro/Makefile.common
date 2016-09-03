@@ -1,3 +1,5 @@
+HAVE_FIXED         = 1
+
 LIBAVCODEC_SOURCE  :=
 LIBAVFORMAT_SOURCE :=
 LIBAVUTIL_SOURCE   :=
@@ -117,8 +119,8 @@ else
 endif
 
 ifeq ($(INTERNAL_WAVPACK),0)
-	LIBS += -lwavpack
-	HAVE_WAVPACK = 1
+	#LIBS += -lwavpack
+	#HAVE_WAVPACK = 1
 endif
 
 ifeq ($(INTERNAL_XVIDCORE),0)
@@ -1423,10 +1425,14 @@ AVCODEC_BLACKLIST := \
 	$(AVCODEC_DIR)/x86/mpegvideoenc_template.c \
 	$(AVCODEC_DIR)/x86/hpeldsp_rnd_template.c \
 	$(AVCODEC_DIR)/x86/w64xmmtest.c \
+	$(AVCODEC_DIR)/sinewin_tablegen_template.c \
+	$(AVCODEC_DIR)/cbrt_tablegen_template.c \
+	$(AVCODEC_DIR)/aacps_tablegen_template.c \
+	$(AVCODEC_DIR)/aacps_fixed_tablegen_template.c \
+	$(AVCODEC_DIR)/aacps_float_tablegen_template.c \
 	$(AVCODEC_DIR)/aacsbr_template.c \
 	$(AVCODEC_DIR)/aacdec_template.c \
 	$(AVCODEC_DIR)/dct-test.c
-
 
 ifeq ($(HAVE_KVAZAAR),1)
 else
