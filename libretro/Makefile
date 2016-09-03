@@ -85,8 +85,8 @@ ifeq ($(OPENGL),1)
 endif
    HAVE_SSA := 1
 
-   LIBS = $(shell pkg-config libass --libs) -pthread
-   CFLAGS += $(shell pkg-config libass --cflags) -pthread
+   LIBS = $(shell pkg-config libass --libs) -lpthread
+   CFLAGS += $(shell pkg-config libass --cflags) -lpthread
 	CFLAGS += -DHAVE_STRUCT_SOCKADDR_STORAGE -DHAVE_STRUCT_ADDRINFO -DHAVE_FMINF
 	HAVE_POLL_H = 1
 	HAVE_GETADDRINFO = 1
@@ -136,8 +136,8 @@ HAVE_PTHREADS = 1
 	HAVE_NETWORK = 1
 	HAVE_SOCKLEN = 1
 
-   LIBS = $(shell pkg-config libass --libs) -pthread
-   CFLAGS += $(shell pkg-config libass --cflags) -pthread
+   LIBS = $(shell pkg-config libass --libs) -lpthread
+   CFLAGS += $(shell pkg-config libass --cflags) -lpthread
 ifneq ($(INTERNAL_LIBAVCODEC),1)
    LIBS += $(shell pkg-config libavcodec --libs)
    CFLAGS += $(shell pkg-config libavcodec --cflags)
