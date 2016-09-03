@@ -151,8 +151,8 @@ ifeq ($(INTERNAL_XVIDCORE),0)
 endif
 
 ifeq ($(INTERNAL_LIBTHEORA),0)
-	LIBS += -ltheora -ltheoraenc -ltheoradec
-	HAVE_LIBTHEORA = 1
+	#LIBS += -ltheora -ltheoraenc -ltheoradec
+	#HAVE_LIBTHEORA = 1
 endif
 
 ifeq ($(INTERNAL_VPX),0)
