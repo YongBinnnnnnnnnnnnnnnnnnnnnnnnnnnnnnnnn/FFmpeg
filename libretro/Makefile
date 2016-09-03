@@ -20,6 +20,7 @@ INTERNAL_WAVPACK       = 0
 INTERNAL_XVIDCORE      = 0
 INTERNAL_VPX           = 0
 
+WANT_LIBASS            = 0
 
 BAKE_IN_FFMPEG := 0
 
@@ -85,8 +86,6 @@ ifeq ($(OPENGL),1)
 endif
    HAVE_SSA := 1
 
-   LIBS = $(shell pkg-config libass --libs) -lpthread
-   CFLAGS += $(shell pkg-config libass --cflags) -lpthread
 	CFLAGS += -DHAVE_STRUCT_SOCKADDR_STORAGE -DHAVE_STRUCT_ADDRINFO -DHAVE_FMINF
 	HAVE_POLL_H = 1
 	HAVE_GETADDRINFO = 1
@@ -119,8 +118,6 @@ endif
 	HAVE_SOCKLEN = 1
 	HAVE_PTHREADS = 1
 
-   LIBS = $(shell pkg-config libass --libs) -lpthread
-   CFLAGS += $(shell pkg-config libass --cflags) -lpthread
 
 else ifneq (,$(findstring win,$(platform)))
 
@@ -148,6 +145,7 @@ INTERNAL_LIBAVUTIL     = 1
 INTERNAL_LIBSWRESAMPLE = 1
 INTERNAL_LIBSWSCALE    = 1
 
+INTERNAL_LIBASS        = 0
 INTERNAL_LIBFLAC       = 1
 INTERNAL_LIBOGG        = 1
 INTERNAL_LIBLAME       = 1
@@ -172,6 +170,19 @@ else ifneq (,$(findstring win,$(platform)))
 endif
 endif
 
+ifeq ($(INTERNAL_LIBASS),1)
+else
+ifeq ($(WANT_LIBASS),1)
+
+ifneq (,$(findstring unix,$(platform)))
+ifneq (,$(findstring osx,$(platform)))
+   LIBS = $(shell pkg-config libass --libs) -lpthread
+   CFLAGS += $(shell pkg-config libass --cflags) -lpthread
+endif
+endif
+
+endif
+endif
 
 ifeq ($(INTERNAL_LIBAVFORMAT),1)
 	BAKE_IN_FFMPEG += 1
