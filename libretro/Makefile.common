@@ -126,7 +126,7 @@ else
 	LIBOGG_DIR=$(DEPS_DIR)/libogg
 	DEFINES += -DOV_EXCLUDE_STATIC_CALLBACKS
 	HAVE_LIBOGG = 1
-	INCFLAGS    += $(LIBOGG_DIR)/include
+	INCFLAGS    += -I$(LIBOGG_DIR)/include
 
 	DEPS_SOURCE += $(LIBOGG_DIR)/src/bitwise.c \
 						$(LIBOGG_DIR)/src/framing.c
