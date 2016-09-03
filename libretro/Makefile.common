@@ -1319,6 +1319,7 @@ LIBAVUTIL_SOURCE += \
 						  $(AVUTIL_DIR)/tree.c \
 						  $(AVUTIL_DIR)/utils.c \
 						  $(AVUTIL_DIR)/md5.c \
+						  $(AVUTIL_DIR)/color_utils.c \
 						  $(AVUTIL_DIR)/log2_tab.c
 
 ifeq ($(ARCH_X86),1)
