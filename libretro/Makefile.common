@@ -110,8 +110,8 @@ else
 endif
 
 ifeq ($(INTERNAL_LIBSPEEX),0)
-	LIBS += -lspeex
-	HAVE_LIBSPEEX = 1
+	#LIBS += -lspeex
+	#HAVE_LIBSPEEX = 1
 endif
 
 ifeq ($(INTERNAL_WEBP),0)
