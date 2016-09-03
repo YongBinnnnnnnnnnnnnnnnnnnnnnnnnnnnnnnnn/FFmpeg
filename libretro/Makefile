@@ -212,7 +212,7 @@ else ifneq (,$(findstring win,$(platform)))
 endif
 endif
 
-ifeq ($(INTERNAL_LIBWSCALE),1)
+ifeq ($(INTERNAL_LIBSWSCALE),1)
 	BAKE_IN_FFMPEG += 1
 else
 ifneq (,$(findstring unix,$(platform)))
