@@ -4,6 +4,7 @@
 #include <math.h>
 
 #include <glsym/glsym.h>
+#include <glsym/rglgen.h>
 #include <libretro.h>
 
 #include <retro_miscellaneous.h>

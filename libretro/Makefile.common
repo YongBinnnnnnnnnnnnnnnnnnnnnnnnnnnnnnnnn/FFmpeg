@@ -4,6 +4,7 @@ LIBAVUTIL_SOURCE   :=
 DEPS_SOURCE        :=
 DEFINES            := -DHAVE_GMTIME_R -DHAVE_LOCALTIME_R -DHAVE_SWRESAMPLE
 LIBRETRO_SOURCE    := 
+GL_SOURCE          :=
 
 DEPS_DIR           := $(CORE_DIR)/deps
 LIBRETRO_COMM_DIR  := $(CORE_DIR)/libretro-common
@@ -2385,21 +2386,22 @@ ifeq ($(HAVE_OPENGL),1)
 ifeq ($(GLES),1)
 	LIBS      += -lGLESv3
 	GLFLAGS   += -DHAVE_OPENGLES -DHAVE_OPENGLES3
-	SOURCES_C += $(LIBRETRO_COMM_DIR)/glsym/glsym_es3.c
+	GL_SOURCE += $(LIBRETRO_COMM_DIR)/glsym/glsym_es3.c
 else
 	LIBS += $(GL_LIB)
 	GLFLAGS += -DHAVE_OPENGL
-	SOURCES_C += $(LIBRETRO_COMM_DIR)/glsym/glsym_gl.c
+	GL_SOURCE += $(LIBRETRO_COMM_DIR)/glsym/glsym_gl.c
 endif
-SOURCES_C += $(LIBRETRO_COMM_DIR)/glsym/rglgen.c
+GL_SOURCE += $(LIBRETRO_COMM_DIR)/glsym/rglgen.c
 endif
 
-SOURCES_C := 	$(DEPS_SOURCE) \
-				 	$(LIBRETRO_SOURCE) \
-				 	$(LIBAVUTIL_SOURCE) \
-				 	$(LIBAVFORMAT_SOURCE) \
-				 	$(LIBSWSCALE_SOURCE) \
-				 	$(LIBAVCODEC_SOURCE) \
-				 	$(LIBSWRESAMPLE_SOURCE)
+SOURCES_C := 	$(GL_SOURCE) \
+                $(DEPS_SOURCE) \
+                $(LIBRETRO_SOURCE) \
+                $(LIBAVUTIL_SOURCE) \
+                $(LIBAVFORMAT_SOURCE) \
+                $(LIBSWSCALE_SOURCE) \
+                $(LIBAVCODEC_SOURCE) \
+                $(LIBSWRESAMPLE_SOURCE)
 
 SOURCES_CXX := $(FFT_SOURCE)
