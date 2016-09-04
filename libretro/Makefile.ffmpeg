@@ -1839,9 +1839,14 @@ AVCODEC_BLACKLIST += $(AVCODEC_DIR)/videotoolbox.c
 
 LIBAVCODEC_SOURCE += $(filter-out $(AVCODEC_BLACKLIST),$(wildcard $(AVCODEC_DIR)/*.c))
 
+ifeq ($(ARCH_ARM),1)
+LIBAVCODEC_SOURCE += $(filter-out $(AVCODEC_BLACKLIST),$(wildcard $(AVCODEC_DIR)/arm/*.c))
+endif
+
 ifeq ($(ARCH_X86),1)
 LIBAVCODEC_SOURCE += $(filter-out $(AVCODEC_BLACKLIST),$(wildcard $(AVCODEC_DIR)/x86/*.c))
 endif
+
 endif
 
 # Parser switches
