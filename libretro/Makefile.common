@@ -163,7 +163,11 @@ endif
 
 endif
 
-LIBS += -lm -lpthread
+LIBS += -lm
+
+ifeq ($(HAVE_PTHREADS),1)
+LIBS += -lpthread
+endif
 
 DEFINES += -DCONFIG_SMALL=0
 

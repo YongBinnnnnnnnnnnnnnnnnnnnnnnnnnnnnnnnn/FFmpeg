@@ -95,7 +95,7 @@ endif
 
 else ifneq (,$(findstring osx,$(platform)))
 
-	ARCH_X86 = 1
+   ARCH_X86 = 1
    LIBRETRO_SWITCH = 1
    TARGET := $(TARGET_NAME)_libretro.dylib
    fpic := -fPIC
@@ -107,7 +107,7 @@ ifeq ($(OPENGL),1)
    HAVE_GL_FFT := 1
    CFLAGS += -DHAVE_GL
 endif
-	HAVE_PTHREADS = 1
+   HAVE_PTHREADS = 1
    OSXVER = `sw_vers -productVersion | cut -d. -f 2`
    OSX_LT_MAVERICKS = `(( $(OSXVER) <= 9)) && echo "YES"`
    fpic += -mmacosx-version-min=10.1
@@ -118,6 +118,43 @@ endif
 	HAVE_SOCKLEN = 1
 	HAVE_PTHREADS = 1
 
+else ifneq (,$(findstring ios,$(platform)))
+
+   ARCH_ARM = 1
+   LIBRETRO_SWITCH = 1
+   TARGET := $(TARGET_NAME)_libretro_ios.dylib
+   fpic := -fPIC
+   SHARED := -dynamiclib
+   CFLAGS += -I. -I.. -DHAVE_FMINF
+ifeq ($(OPENGL),1)
+   GL_LIB := -framework OpenGL
+   HAVE_GL := 1
+   HAVE_GL_FFT := 1
+   CFLAGS += -DHAVE_GL
+endif
+   HAVE_PTHREADS = 1
+
+ifeq ($(IOSSDK),)
+  IOSSDK := $(shell xcodebuild -version -sdk iphoneos Path)
+endif
+
+   CC = cc -arch armv7 -isysroot $(IOSSDK)
+   CXX  = c++ -arch armv7 -isysroot $(IOSSDK)
+   LD = armv7-apple-darwin11-ld
+
+ifeq ($(platform),ios9)
+   CC += -miphoneos-version-min=8.0
+   CFLAGS += -miphoneos-version-min=8.0
+else
+   CC += -miphoneos-version-min=5.0
+   CFLAGS += -miphoneos-version-min=5.0
+endif
+	CFLAGS += -DHAVE_STRUCT_SOCKADDR_STORAGE -DHAVE_STRUCT_ADDRINFO
+	HAVE_POLL_H = 1
+	HAVE_GETADDRINFO = 1
+	HAVE_NETWORK = 1
+	HAVE_SOCKLEN = 1
+	HAVE_PTHREADS = 1
 
 else ifneq (,$(findstring win,$(platform)))
 
