@@ -105,7 +105,7 @@ ifeq ($(OPENGL),1)
    GL_LIB := -framework OpenGL
    HAVE_GL := 1
    HAVE_GL_FFT := 1
-   CFLAGS += -DHAVE_GL
+   CFLAGS += -DHAVE_OPENGL
 endif
    HAVE_PTHREADS = 1
    OSXVER = `sw_vers -productVersion | cut -d. -f 2`
@@ -130,7 +130,7 @@ ifeq ($(OPENGL),1)
    GL_LIB := -framework OpenGL
    HAVE_GL := 1
    HAVE_GL_FFT := 1
-   CFLAGS += -DHAVE_GL
+   CFLAGS += -DHAVE_OPENGLES -DHAVE_OPENGLES3
 endif
    HAVE_PTHREADS = 1
 
