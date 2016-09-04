@@ -1482,6 +1482,7 @@ AVCODEC_BLACKLIST := \
 	$(AVCODEC_DIR)/dsputil_template.c \
 	$(AVCODEC_DIR)/sbrdsp_template.c \
 	$(AVCODEC_DIR)/libcelt_dec.c \
+	$(AVCODEC_DIR)/arm/dct-test.c \
 	$(AVCODEC_DIR)/fft-fixed-test.c \
 	$(AVCODEC_DIR)/fft_template.c \
 	$(AVCODEC_DIR)/ac3enc_template.c \
