@@ -34,7 +34,7 @@ ifeq ($(HAVE_SSA), 1)
 endif
 
 ifeq ($(BAKE_IN_FFMPEG),1)
-include Makefile.ffmpeg
+include $(CORE_DIR)/Makefile.ffmpeg
 endif
 
 ifeq ($(HAVE_OPENGL),1)
