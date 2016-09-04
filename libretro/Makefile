@@ -129,7 +129,7 @@ else ifneq (,$(findstring ios,$(platform)))
 ifeq ($(OPENGL),1)
 	HAVE_OPENGL = 1
 	GLES = 1
-   GL_LIB := -framework OpenGL
+   GL_LIB := -framework OpenGLES
    HAVE_GL_FFT := 1
    CFLAGS += -DHAVE_OPENGLES -DHAVE_OPENGLES3
 endif

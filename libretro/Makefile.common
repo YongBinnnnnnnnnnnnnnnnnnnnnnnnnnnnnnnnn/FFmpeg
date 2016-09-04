@@ -39,7 +39,7 @@ endif
 
 ifeq ($(HAVE_OPENGL),1)
 ifeq ($(GLES),1)
-	LIBS      += -lGLESv3
+	LIBS      += $(GL_LIB)
 	GLFLAGS   += -DHAVE_OPENGLES -DHAVE_OPENGLES3
 	GL_SOURCE += $(LIBRETRO_COMM_DIR)/glsym/glsym_es3.c
 else
