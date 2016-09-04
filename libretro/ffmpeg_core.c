@@ -632,7 +632,7 @@ void CORE_PREFIX(retro_run)(void)
 #ifndef HAVE_OPENGLES
                glBindBuffer(GL_PIXEL_UNPACK_BUFFER, frames[1].pbo);
                data = (uint32_t*)glMapBufferRange(GL_PIXEL_UNPACK_BUFFER,
-                     0, media.width * media.height, GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT);
+                     0, media.width * media.height * sizeof(uint32_t), GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT);
 #endif
 
                fifo_read(video_decode_fifo, data, media.width * media.height * sizeof(uint32_t));
