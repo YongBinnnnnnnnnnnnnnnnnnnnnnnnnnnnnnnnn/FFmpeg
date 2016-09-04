@@ -125,7 +125,7 @@ else ifneq (,$(findstring ios,$(platform)))
    TARGET := $(TARGET_NAME)_libretro_ios.dylib
    fpic := -fPIC
    SHARED := -dynamiclib
-   CFLAGS += -I. -I.. -DHAVE_FMINF
+   CFLAGS += -I. -I.. -DHAVE_FMINF -DIOS
 ifeq ($(OPENGL),1)
    GL_LIB := -framework OpenGL
    HAVE_GL := 1
