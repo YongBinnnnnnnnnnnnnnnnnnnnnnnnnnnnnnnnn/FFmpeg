@@ -169,11 +169,9 @@ ifeq ($(HAVE_PTHREADS),1)
 LIBS += -lpthread
 endif
 
-ifeq ($(HAVE_ARMV7),1)
 ifeq ($(HAVE_NEON),1)
 DEFINES += -DHAVE_NEON=1
-endif
-#else
+else
 DEFINES += -DHAVE_NEON=0
 endif
 
@@ -2393,8 +2391,6 @@ ifeq ($(HAVE_LIBFLAC),1)
 DEFINES += -DCONFIG_FLAC_DEMUXER=1
 else
 DEFINES += -DCONFIG_FLAC_DEMUXER=0
-endif
-
 endif
 
 ifeq ($(HAVE_OPENGL),1)
