@@ -196,7 +196,7 @@ endif
 
 
 ifeq ($(INTERNAL_LIBAVCODEC),1)
-	BAKE_IN_FFMPEG += 1
+	BAKE_IN_FFMPEG=1
 else
 ifneq (,$(findstring unix,$(platform)))
    LIBS += $(shell pkg-config libavcodec --libs)
@@ -224,7 +224,7 @@ endif
 endif
 
 ifeq ($(INTERNAL_LIBAVFORMAT),1)
-	BAKE_IN_FFMPEG += 1
+	BAKE_IN_FFMPEG=1
 else
 ifneq (,$(findstring unix,$(platform)))
    LIBS += $(shell pkg-config libavformat --libs)
@@ -238,7 +238,7 @@ endif
 endif
 
 ifeq ($(INTERNAL_LIBSWRESAMPLE),1)
-	BAKE_IN_FFMPEG += 1
+	BAKE_IN_FFMPEG=1
 else
 ifneq (,$(findstring unix,$(platform)))
    LIBS += $(shell pkg-config libswresample --libs)
@@ -252,7 +252,7 @@ endif
 endif
 
 ifeq ($(INTERNAL_LIBSWSCALE),1)
-	BAKE_IN_FFMPEG += 1
+	BAKE_IN_FFMPEG=1
 else
 ifneq (,$(findstring unix,$(platform)))
    LIBS += $(shell pkg-config libswscale --libs)
@@ -266,7 +266,7 @@ endif
 endif
 
 ifeq ($(INTERNAL_LIBAVUTIL),1)
-	BAKE_IN_FFMPEG += 1
+	BAKE_IN_FFMPEG=1
 else
 ifneq (,$(findstring unix,$(platform)))
    LIBS += $(shell pkg-config libavutil --libs)
