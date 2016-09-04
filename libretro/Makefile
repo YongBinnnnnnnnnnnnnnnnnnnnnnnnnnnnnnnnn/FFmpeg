@@ -134,7 +134,10 @@ ifeq ($(OPENGL),1)
    HAVE_GL_FFT := 1
    CFLAGS += -DHAVE_OPENGLES -DHAVE_OPENGLES3
 endif
+   HAVE_ARMV7=1
    HAVE_PTHREADS = 1
+   ARCH_X86 = 0
+   ARCH_X86_64 = 0
 
 ifeq ($(IOSSDK),)
   IOSSDK := $(shell xcodebuild -version -sdk iphoneos Path)
