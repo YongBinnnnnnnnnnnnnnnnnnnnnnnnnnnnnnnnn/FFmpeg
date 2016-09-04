@@ -1326,6 +1326,10 @@ LIBAVUTIL_SOURCE += \
 						  $(AVUTIL_DIR)/x86/float_dsp_init.c
 endif
 
+ifeq ($(ARCH_ARM),1)
+LIBAVUTIL_SOURCE += $(filter-out $(AVUTIL_BLACKLIST),$(wildcard $(AVUTIL_DIR)/arm/*.c))
+endif
+
 
 ifeq ($(ARCH_PPC),1)
 LIBAVUTIL_SOURCE += $(AVUTIL_DIR)/ppc/cpu.c \
@@ -1460,6 +1464,7 @@ endif
 
 
 AVCODEC_BLACKLIST := \
+        $(AVCODEC_DIR)/arm/neontest.c \
 	$(AVCODEC_DIR)/vda.c \
 	$(AVCODEC_DIR)/libvo-aacenc.c \
 	$(AVCODEC_DIR)/libvo-amrwbenc.c \
@@ -1841,6 +1846,7 @@ LIBAVCODEC_SOURCE += $(filter-out $(AVCODEC_BLACKLIST),$(wildcard $(AVCODEC_DIR)
 
 ifeq ($(ARCH_ARM),1)
 LIBAVCODEC_SOURCE += $(filter-out $(AVCODEC_BLACKLIST),$(wildcard $(AVCODEC_DIR)/arm/*.c))
+DEFINES += -DHAVE_AS_DN_DIRECTIVE=0
 endif
 
 ifeq ($(ARCH_X86),1)
