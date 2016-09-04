@@ -22,6 +22,8 @@ INTERNAL_VPX           = 0
 
 WANT_LIBASS            = 0
 
+GLFLAGS   :=
+
 BAKE_IN_FFMPEG := 0
 
 #CPU Optimization flags
@@ -46,7 +48,7 @@ HAVE_LIBOPUS   = 0
 HAVE_ZLIB      = 0
 
 #Video support
-OPENGL = 1
+OPENGL 		  = 1
 HAVE_CODEC_HW = 0
 
 CORE_DIR := .
@@ -80,8 +82,7 @@ ifneq (,$(findstring unix,$(platform)))
    SHARED := -shared -Wl,--version-script=link.T -Wl,--no-undefined -fPIC
 ifeq ($(OPENGL),1)
    GL_LIB := -lGL
-   CFLAGS += -DHAVE_OPENGL
-   HAVE_GL := 1
+	HAVE_OPENGL = 1
 	HAVE_GL_FFT := 1
 endif
    HAVE_SSA := 1
@@ -101,11 +102,11 @@ else ifneq (,$(findstring osx,$(platform)))
    fpic := -fPIC
    SHARED := -dynamiclib
    CFLAGS += -I. -I.. -DHAVE_FMINF
+
 ifeq ($(OPENGL),1)
    GL_LIB := -framework OpenGL
-   HAVE_GL := 1
    HAVE_GL_FFT := 1
-   CFLAGS += -DHAVE_OPENGL
+	HAVE_OPENGL = 1
 endif
    HAVE_PTHREADS = 1
    OSXVER = `sw_vers -productVersion | cut -d. -f 2`
@@ -127,8 +128,9 @@ else ifneq (,$(findstring ios,$(platform)))
    SHARED := -dynamiclib
    CFLAGS += -I. -I.. -DHAVE_FMINF -DIOS
 ifeq ($(OPENGL),1)
+	HAVE_OPENGL = 1
+	GLES = 1
    GL_LIB := -framework OpenGL
-   HAVE_GL := 1
    HAVE_GL_FFT := 1
    CFLAGS += -DHAVE_OPENGLES -DHAVE_OPENGLES3
 endif
@@ -167,7 +169,6 @@ else ifneq (,$(findstring win,$(platform)))
 ifeq ($(OPENGL),1)
    GL_LIB := -lopengl32
    CFLAGS += -DHAVE_OPENGL
-   HAVE_GL := 1
 	HAVE_GL_FFT := 1
 	WIN32_PLATFORM := 1
 endif
@@ -281,7 +282,8 @@ CFLAGS += -D__LIBRETRO__
 
 include Makefile.common
 
-CFLAGS += $(DEFINES) $(INCFLAGS)
+CFLAGS   += $(DEFINES) $(INCFLAGS) $(GLFLAGS)
+CXXFLAGS += $(DEFINES) $(INCFLAGS) $(GLFLAGS)
 CFLAGS += -Wall $(fpic)
 
 ifeq ($(DEBUG), 1)

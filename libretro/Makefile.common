@@ -19,8 +19,7 @@ INCFLAGS           := -I$(BASE_DIR) -I$(CORE_DIR) -I$(LIBRETRO_COMM_DIR)/include
 
 LIBRETRO_SOURCE    += $(CORE_DIR)/ffmpeg_core.c \
 							 $(LIBRETRO_COMM_DIR)/queues/fifo_queue.c \
-							 $(LIBRETRO_COMM_DIR)/rthreads/rthreads.c \
-							 $(LIBRETRO_COMM_DIR)/glsym/rglgen.c
+							 $(LIBRETRO_COMM_DIR)/rthreads/rthreads.c
 
 ifeq ($(HAVE_BIGENDIAN),1)
 CPUOPTS += -DHAVE_BIGENDIAN=1 -DMSB_FIRST
@@ -2382,15 +2381,17 @@ ifeq ($(HAVE_GL_FFT), 1)
    FFT_SOURCE += $(CORE_DIR)/fft/fft.cpp
 endif
 
-ifeq ($(HAVE_GL), 1)
-   ifeq ($(GLES), 1)
-      LIBS += -lGLESv2
-      CFLAGS += -DHAVE_OPENGLES -DHAVE_OPENGLES2
-		LIBRETRO_SOURCE += $(LIBRETRO_COMM_DIR)/glsym/glsym_es2.c
-   else
-      LIBS += $(GL_LIB)
-   endif
-   LIBRETRO_SOURCE += $(LIBRETRO_COMM_DIR)/glsym/glsym_gl.c
+ifeq ($(HAVE_OPENGL),1)
+ifeq ($(GLES),1)
+	LIBS      += -lGLESv3
+	GLFLAGS   += -DHAVE_OPENGLES -DHAVE_OPENGLES3
+	SOURCES_C += $(LIBRETRO_COMM_DIR)/glsym/glsym_es3.c
+else
+	LIBS += $(GL_LIB)
+	GLFLAGS += -DHAVE_OPENGL
+	SOURCES_C += $(LIBRETRO_COMM_DIR)/glsym/glsym_gl.c
+endif
+SOURCES_C += $(LIBRETRO_COMM_DIR)/glsym/rglgen.c
 endif
 
 SOURCES_C := 	$(DEPS_SOURCE) \
