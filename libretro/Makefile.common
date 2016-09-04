@@ -165,9 +165,6 @@ endif
 
 LIBS += -lm
 
-ifeq ($(HAVE_PTHREADS),1)
-LIBS += -lpthread
-endif
 
 ifeq ($(HAVE_NEON),1)
 DEFINES += -DHAVE_NEON=1
@@ -2410,6 +2407,10 @@ ifeq ($(HAVE_GL_FFT), 1)
    INCFLAGS   += -I$(CORE_DIR)/fft
    FFT_SOURCE += $(CORE_DIR)/fft/fft.cpp
 endif
+endif
+
+ifeq ($(HAVE_PTHREADS),1)
+LIBS += -lpthread
 endif
 
 SOURCES_C := 	$(GL_SOURCE) \

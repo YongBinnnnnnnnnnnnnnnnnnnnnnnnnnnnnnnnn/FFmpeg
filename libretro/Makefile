@@ -29,7 +29,7 @@ BAKE_IN_FFMPEG := 0
 #CPU Optimization flags
 HAVE_SSE2 = 0
 HAVE_MMX = 0
-HAVE_THREADS = 1
+HAVE_THREADS=1
 
 #Additional codec support for internal FFmpeg
 HAVE_WAVPACK   = 0
@@ -92,7 +92,7 @@ endif
 	HAVE_GETADDRINFO = 1
 	HAVE_NETWORK = 1
 	HAVE_SOCKLEN = 1
-	HAVE_PTHREADS = 1
+	HAVE_PTHREADS=1
 
 else ifneq (,$(findstring osx,$(platform)))
 
@@ -108,7 +108,6 @@ ifeq ($(OPENGL),1)
    HAVE_GL_FFT := 1
 	HAVE_OPENGL = 1
 endif
-   HAVE_PTHREADS = 1
    OSXVER = `sw_vers -productVersion | cut -d. -f 2`
    OSX_LT_MAVERICKS = `(( $(OSXVER) <= 9)) && echo "YES"`
    fpic += -mmacosx-version-min=10.1
@@ -117,7 +116,7 @@ endif
 	HAVE_GETADDRINFO = 1
 	HAVE_NETWORK = 1
 	HAVE_SOCKLEN = 1
-	HAVE_PTHREADS = 1
+	HAVE_PTHREADS=1
 
 else ifneq (,$(findstring ios,$(platform)))
 
@@ -135,7 +134,7 @@ ifeq ($(OPENGL),1)
    CFLAGS += -DHAVE_OPENGLES -DHAVE_OPENGLES3
 endif
    HAVE_ARMV7=1
-   HAVE_PTHREADS = 1
+   HAVE_PTHREADS=1
    ARCH_X86 = 0
    ARCH_X86_64 = 0
 
@@ -159,7 +158,6 @@ endif
 	HAVE_GETADDRINFO = 1
 	HAVE_NETWORK = 1
 	HAVE_SOCKLEN = 1
-	HAVE_PTHREADS = 1
 
 else ifneq (,$(findstring win,$(platform)))
 
