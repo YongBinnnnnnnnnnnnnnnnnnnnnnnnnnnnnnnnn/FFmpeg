@@ -2373,15 +2373,6 @@ endif
 
 endif
 
-ifeq ($(HAVE_GL_FFT), 1)
-   DEFINES += -DHAVE_GL_FFT
-   ifeq ($(GLES), 1)
-      DEFINES += -DHAVE_OPENGLES3
-   endif
-	INCFLAGS   += -I$(CORE_DIR)/fft
-   FFT_SOURCE += $(CORE_DIR)/fft/fft.cpp
-endif
-
 ifeq ($(HAVE_OPENGL),1)
 ifeq ($(GLES),1)
 	LIBS      += -lGLESv3
@@ -2393,6 +2384,12 @@ else
 	GL_SOURCE += $(LIBRETRO_COMM_DIR)/glsym/glsym_gl.c
 endif
 GL_SOURCE += $(LIBRETRO_COMM_DIR)/glsym/rglgen.c
+
+ifeq ($(HAVE_GL_FFT), 1)
+   DEFINES    += -DHAVE_GL_FFT
+   INCFLAGS   += -I$(CORE_DIR)/fft
+   FFT_SOURCE += $(CORE_DIR)/fft/fft.cpp
+endif
 endif
 
 SOURCES_C := 	$(GL_SOURCE) \
