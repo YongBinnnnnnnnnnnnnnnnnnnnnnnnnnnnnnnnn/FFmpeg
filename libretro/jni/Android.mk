@@ -1,5 +1,8 @@
 LOCAL_PATH := $(call my-dir)
+LIBRETRO_SWITCH=1
 BAKE_IN_FFMPEG=1
+LIBS:=
+GLFLAGS:=
 
 include $(CLEAR_VARS)
 
