@@ -120,7 +120,7 @@ endif
 
 else ifneq (,$(findstring ios,$(platform)))
 
-   ARCH_ARM = 1
+   #ARCH_ARM = 1
    LIBRETRO_SWITCH = 1
    TARGET := $(TARGET_NAME)_libretro_ios.dylib
    fpic := -fPIC
