@@ -4,7 +4,6 @@
 #include <math.h>
 
 #include <glsym/glsym.h>
-#include <glsym/rglgen.h>
 #include <libretro.h>
 
 #include <retro_miscellaneous.h>
@@ -154,17 +153,18 @@ static GLuint fft_compile_program(glfft_t *fft,
 
 static void fft_render(glfft_t *fft, GLuint backbuffer, unsigned width, unsigned height)
 {
-   mat4 mvp;
-
    /* Render scene. */
    glBindFramebuffer(GL_FRAMEBUFFER, fft->ms_fbo ? fft->ms_fbo : backbuffer);
    glViewport(0, 0, width, height);
    glClearColor(0.1f, 0.15f, 0.1f, 1.0f);
    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
-   vec3 eye(0, 80, -60);
-   mvp = perspective((float)M_HALF_PI, (float)width / height, 1.0f, 500.0f) *
-      lookAt(eye, eye + vec3(0.0f, 0.0f, 1.0f), vec3(0.0f, 1.0f, 0.0f));
+   vec3 eye        = vec3(0, 80, -60);
+   vec3 center     = eye + vec3(0.0f, 0.0f, 1.0f);
+   vec3 up         = vec3(0.0f, 1.0f, 0.0f);
+   mat4 mvp_persp  = perspective((float)M_HALF_PI, (float)width / height, 1.0f, 500.0f);
+   mat4 mvp_lookat = lookAt(eye, center, up);
+   mat4 mvp        = mvp_persp * mvp_lookat;
 
    glUseProgram(fft->block.prog);
    glUniformMatrix4fv(glGetUniformLocation(fft->block.prog, "uMVP"),
