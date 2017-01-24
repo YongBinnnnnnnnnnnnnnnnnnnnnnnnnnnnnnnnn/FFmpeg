@@ -1,3 +1,4 @@
+/*  Copyright (C) 2016 - Brad Parker */
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -1566,6 +1567,9 @@ bool CORE_PREFIX(retro_load_game)(const struct retro_game_info *info)
 
       { 0 },
    };
+
+   if (!info)
+      return false;
 
    CORE_PREFIX(environ_cb)(RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS, desc);
 
