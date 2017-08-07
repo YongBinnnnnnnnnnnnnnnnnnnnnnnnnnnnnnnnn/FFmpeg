@@ -75,6 +75,13 @@ endif
 
 TARGET_NAME := ffmpeg
 
+CFLAGS += -DUPSTREAM_VERSION=\"$(shell cat ../RELEASE)\"
+
+GIT_VERSION ?= " $(shell git rev-parse --short HEAD || echo unknown)"
+ifneq ($(GIT_VERSION)," unknown")
+	CFLAGS += -DGIT_VERSION=\"$(GIT_VERSION)\"
+endif
+
 ifneq (,$(findstring unix,$(platform)))
 	ARCH_X86 = 1
    TARGET := $(TARGET_NAME)_libretro.so
