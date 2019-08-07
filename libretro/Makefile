@@ -130,7 +130,7 @@ else ifneq (,$(findstring ios,$(platform)))
    TARGET := $(TARGET_NAME)_libretro_ios.dylib
    fpic := -fPIC
    SHARED := -dynamiclib
-   CFLAGS += -I. -I.. -DHAVE_FMINF -DIOS
+   CFLAGS += -I. -I.. -DHAVE_FMINF -DIOS -DHAVE_UNISTD_H
 ifeq ($(OPENGL),1)
 	HAVE_OPENGL = 1
 	GLES = 1
@@ -147,11 +147,16 @@ ifeq ($(IOSSDK),)
   IOSSDK := $(shell xcodebuild -version -sdk iphoneos Path)
 endif
 
+ifeq ($(platform),ios-arm64)
+   CC = cc -arch arm64 -isysroot $(IOSSDK)
+   CXX  = c++ -arch arm64 -isysroot $(IOSSDK)
+else
    CC = cc -arch armv7 -isysroot $(IOSSDK)
    CXX  = c++ -arch armv7 -isysroot $(IOSSDK)
    LD = armv7-apple-darwin11-ld
+endif
 
-ifeq ($(platform),ios9)
+ifeq ($(platform),$(filter $(platform),ios9 ios-arm64))
    CC += -miphoneos-version-min=8.0
    CFLAGS += -miphoneos-version-min=8.0
 else
