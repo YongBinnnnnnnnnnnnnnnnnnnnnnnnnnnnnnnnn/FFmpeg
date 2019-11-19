@@ -3,7 +3,7 @@ LIBAVFORMAT_SOURCE :=
 LIBAVUTIL_SOURCE   :=
 DEPS_SOURCE        :=
 DEFINES            := -DHAVE_SWRESAMPLE
-LIBRETRO_SOURCE    := 
+LIBRETRO_SOURCE    :=
 GL_SOURCE          :=
 
 CPUOPTS            :=
@@ -16,14 +16,13 @@ AVUTIL_DIR     	 := $(BASE_DIR)/libavutil
 SWSCALE_DIR    	 := $(BASE_DIR)/libswscale
 SWRESAMPLE_DIR 	 := $(BASE_DIR)/libswresample
 
-
 INCFLAGS           += -I$(BASE_DIR) -I$(CORE_DIR) -I$(LIBRETRO_COMM_DIR)/include -I$(LIBRETRO_COMM_DIR)/include/compat
 
 LIBRETRO_SOURCE    += $(CORE_DIR)/ffmpeg_core.c \
 							 $(LIBRETRO_COMM_DIR)/queues/fifo_queue.c \
 							 $(LIBRETRO_COMM_DIR)/rthreads/rthreads.c
 
-ifeq ($(LIBRETRO_SWITCH),1)
+ifeq ($(LIBRETRO_SWITCH), 1)
 DEFINES += -DLIBRETRO_SWITCH=1
 INTERNAL_LIBAVCODEC    = 1
 INTERNAL_LIBAVFORMAT   = 1

@@ -1,4 +1,4 @@
-LIBRETRO_SWITCH        = 1
+LIBRETRO_SWITCH        = 0
 
 INTERNAL_LIBAVCODEC    = 0
 INTERNAL_LIBAVFORMAT   = 0
@@ -12,7 +12,7 @@ INTERNAL_LIBLAME       = 0
 INTERNAL_LIBFAAC       = 0
 INTERNAL_LIBSPEEX      = 0
 INTERNAL_LIBTHEORA     = 0
-INTERNAL_LIBOPUS       = 0  
+INTERNAL_LIBOPUS       = 0
 INTERNAL_LIBVORBIS     = 0
 INTERNAL_WEBP          = 0
 INTERNAL_ZLIB          = 0
@@ -75,11 +75,9 @@ endif
 
 TARGET_NAME := ffmpeg
 
-CFLAGS += -DUPSTREAM_VERSION=\"$(shell cat ../RELEASE)\"
-
 GIT_VERSION ?= " $(shell git rev-parse --short HEAD || echo unknown)"
 ifneq ($(GIT_VERSION)," unknown")
-	CFLAGS += -DGIT_VERSION=\"$(GIT_VERSION)\"
+       CFLAGS += -DGIT_VERSION=\"$(GIT_VERSION)\"
 endif
 
 ifneq (,$(findstring unix,$(platform)))
@@ -189,8 +187,6 @@ else ifeq ($(platform), emscripten)
 else
 
 	ARCH_X86 = 1
-   CC = gcc
-	CXX = g++
    TARGET := $(TARGET_NAME)_libretro.dll
    SHARED := -shared -static-libgcc -static-libstdc++ -s -Wl,--version-script=link.T -Wl,--no-undefined
    CFLAGS += -Iffmpeg
@@ -203,11 +199,15 @@ endif
    LIBS += -L.
 endif
 
+ifeq ($(LIBRETRO_SWITCH), 1)
+   CFLAGS += -DUPSTREAM_VERSION=\"$(shell cat ../RELEASE)\"
+endif
+
 CFLAGS += -D__LIBRETRO__
 
 include Makefile.common
 
-CFLAGS   += $(DEFINES) $(INCFLAGS) $(GLFLAGS)
+CFLAGS += $(DEFINES) $(INCFLAGS) $(GLFLAGS) $(DEF_FLAGS)
 CFLAGS += -Wall $(fpic)
 
 ifeq ($(DEBUG), 1)
@@ -238,4 +238,3 @@ clean:
 	rm -f $(TARGET)
 
 .PHONY: clean
-
