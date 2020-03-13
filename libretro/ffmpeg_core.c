@@ -1461,6 +1461,39 @@ static void context_reset(void)
 }
 #endif
 
+void av_log_cb(void* ptr, int level, const char* fmt, va_list vl)
+{
+    char line[1024];
+    int retro_level = RETRO_LOG_ERROR;
+
+    switch (level) {
+    case AV_LOG_ERROR:
+    case AV_LOG_QUIET:
+    case AV_LOG_PANIC:
+    case AV_LOG_FATAL:
+	    retro_level = RETRO_LOG_ERROR;
+	    break;
+    case AV_LOG_WARNING:
+	    retro_level = RETRO_LOG_WARN;
+	    break;
+    case AV_LOG_INFO:
+    case AV_LOG_VERBOSE:
+	    retro_level = RETRO_LOG_INFO;
+	    break;
+    case AV_LOG_DEBUG:
+    case AV_LOG_TRACE:
+      	    retro_level = RETRO_LOG_DEBUG;
+	    break;
+    default:
+	    retro_level = RETRO_LOG_ERROR;
+	    break;
+    }
+ 
+    vsnprintf(line, sizeof(line), fmt, vl);
+
+    log_cb(retro_level, "av_log: %s", line);
+}
+
 void CORE_PREFIX(retro_unload_game)(void)
 {
    unsigned i;
@@ -1567,6 +1600,8 @@ bool CORE_PREFIX(retro_load_game)(const struct retro_game_info *info)
 
       { 0 },
    };
+
+   av_log_set_callback(av_log_cb);
 
    if (!info)
       return false;
