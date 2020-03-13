@@ -1,4 +1,4 @@
-/* Copyright  (C) 2010-2016 The RetroArch team
+/* Copyright  (C) 2010-2020 The RetroArch team
  *
  * ---------------------------------------------------------------------------------------
  * The following license statement only applies to this file (psp_pthread.h).
@@ -62,7 +62,6 @@ typedef struct
    sthreadEntry start_routine;
 } sthread_args_struct;
 
-
 static int psp_thread_wrap(SceSize args, void *argp)
 {
    sthread_args_struct* sthread_args = (sthread_args_struct*)argp;
@@ -73,7 +72,7 @@ static int psp_thread_wrap(SceSize args, void *argp)
 static INLINE int pthread_create(pthread_t *thread,
       const pthread_attr_t *attr, void *(*start_routine)(void*), void *arg)
 {
-   sprintf(name_buffer, "0x%08X", (uint32_t) thread);
+   snprintf(name_buffer, sizeof(name_buffer), "0x%08X", (unsigned int) thread);
 
 #ifdef VITA
    *thread = sceKernelCreateThread(name_buffer, psp_thread_wrap,
@@ -93,7 +92,7 @@ static INLINE int pthread_create(pthread_t *thread,
 static INLINE int pthread_mutex_init(pthread_mutex_t *mutex,
       const pthread_mutexattr_t *attr)
 {
-   sprintf(name_buffer, "0x%08X", (uint32_t) mutex);
+   snprintf(name_buffer, sizeof(name_buffer), "0x%08X", (unsigned int) mutex);
 
 #ifdef VITA
    *mutex = sceKernelCreateMutex(name_buffer, 0, 0, 0);
@@ -118,7 +117,6 @@ static INLINE int pthread_mutex_lock(pthread_mutex_t *mutex)
 {
 #ifdef VITA
 	 int ret = sceKernelLockMutex(*mutex, 1, 0);
-	 //sceClibPrintf("pthread_mutex_lock: %x\n",ret);
 	 return ret;
 
 #else
@@ -131,14 +129,12 @@ static INLINE int pthread_mutex_unlock(pthread_mutex_t *mutex)
 {
 #ifdef VITA
 	int ret = sceKernelUnlockMutex(*mutex, 1);
-	//sceClibPrintf("pthread_mutex_unlock: %x\n",ret);
 	return ret;
 #else
    /* FIXME: stub */
    return 1;
 #endif
 }
-
 
 static INLINE int pthread_join(pthread_t thread, void **retval)
 {
@@ -221,27 +217,25 @@ static INLINE int pthread_cond_init(pthread_cond_t *cond,
       const pthread_condattr_t *attr)
 {
 #ifdef VITA
-  
-	pthread_mutex_init(&cond->mutex,NULL);
-	sceClibPrintf("pthread_cond_init: mutex %x\n",cond->mutex);
-  if(cond->mutex<0){
-    return cond->mutex;
-	}
-  sprintf(name_buffer, "0x%08X", (uint32_t) cond);
-  //cond->sema = sceKernelCreateCond(name_buffer, 0, cond->mutex, 0);
-	cond->sema = sceKernelCreateSema(name_buffer, 0, 0, 1, 0);
-	sceClibPrintf("pthread_cond_init: sema %x\n",cond->sema);
-	if(cond->sema<0){
-		pthread_mutex_destroy(&cond->mutex);
-  	return cond->sema;
-	}
-	
-	cond->waiting = 0;
 
-	
-	return 0;
-	
-	
+   pthread_mutex_init(&cond->mutex,NULL);
+
+   if(cond->mutex<0)
+      return cond->mutex;
+
+   snprintf(name_buffer, sizeof(name_buffer), "0x%08X", (unsigned int) cond);
+   cond->sema = sceKernelCreateSema(name_buffer, 0, 0, 1, 0);
+
+   if(cond->sema < 0)
+   {
+      pthread_mutex_destroy(&cond->mutex);
+      return cond->sema;
+   }
+
+   cond->waiting = 0;
+
+   return 0;
+
 #else
    /* FIXME: stub */
    return 1;
@@ -255,8 +249,7 @@ static INLINE int pthread_cond_signal(pthread_cond_t *cond)
 	if (cond->waiting)
    {
 		--cond->waiting;
-		int ret = sceKernelSignalSema(cond->sema, 1);
-		sceClibPrintf("pthread_cond_signal: %x\n",ret);
+		sceKernelSignalSema(cond->sema, 1);
 	}
 	pthread_mutex_unlock(&cond->mutex);
 	return 0;
@@ -285,7 +278,6 @@ static INLINE int pthread_cond_destroy(pthread_cond_t *cond)
   return 1;
 #endif
 }
-
 
 static INLINE int pthread_detach(pthread_t thread)
 {
