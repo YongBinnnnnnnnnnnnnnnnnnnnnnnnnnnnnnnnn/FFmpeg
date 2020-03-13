@@ -1614,7 +1614,18 @@ bool CORE_PREFIX(retro_load_game)(const struct retro_game_info *info)
       goto error;
    }
 
-   if (avformat_open_input(&fctx, info->path, NULL, NULL) < 0)
+   // 3DS prefixes paths with device. E.g. sdmc0:/myfile.avi but
+   // ffmpeg tries to find "sdmc0" protocol. Prefix with file:// to
+   // make a valid URL
+#ifdef _3DS
+   char *path = malloc (strlen(info->path) + 10);
+   strcpy(path, "file://");
+   strcat(path, info->path);
+#else
+   const char *path = info->path;
+#endif
+
+   if (avformat_open_input(&fctx, path, NULL, NULL) < 0)
    {
       LOG_ERR("Failed to open input.");
       goto error;
@@ -1626,7 +1637,7 @@ bool CORE_PREFIX(retro_load_game)(const struct retro_game_info *info)
       goto error;
    }
 
-   av_dump_format(fctx, 0, info->path, 0);
+   av_dump_format(fctx, 0, path, 0);
 
    if (!open_codecs())
    {
