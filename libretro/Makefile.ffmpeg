@@ -1436,6 +1436,10 @@ ifneq ($(HAVE_POLL_H),1)
 AVFORMAT_BLACKLIST += $(AVFORMAT_DIR)/sapdec.c
 endif
 
+ifeq ($(platform), ctr)
+AVFORMAT_BLACKLIST += $(AVFORMAT_DIR)/unix.c
+endif
+
 LIBAVFORMAT_SOURCE += $(filter-out $(AVFORMAT_BLACKLIST),$(wildcard $(AVFORMAT_DIR)/*.c))
 endif
 
