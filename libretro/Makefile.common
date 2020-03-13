@@ -19,11 +19,14 @@ SWRESAMPLE_DIR 	 := $(BASE_DIR)/libswresample
 INCFLAGS           += -I$(BASE_DIR) -I$(CORE_DIR) -I$(LIBRETRO_COMM_DIR)/include -I$(LIBRETRO_COMM_DIR)/include/compat
 
 LIBRETRO_SOURCE    += $(CORE_DIR)/ffmpeg_core.c \
-							 $(LIBRETRO_COMM_DIR)/queues/fifo_queue.c \
-							 $(LIBRETRO_COMM_DIR)/rthreads/rthreads.c
+			 $(LIBRETRO_COMM_DIR)/rthreads/rthreads.c
 
-ifeq ($(LIBRETRO_SWITCH), 1)
-DEFINES += -DLIBRETRO_SWITCH=1
+ifeq ($(STATIC_LINKING), 0)
+LIBRETRO_SOURCE    += 	 $(LIBRETRO_COMM_DIR)/queues/fifo_queue.c
+endif
+
+ifeq ($(LIBRETRO_EMBED_FFMPEG), 1)
+DEFINES += -DLIBRETRO_EMBED_FFMPEG=1
 INTERNAL_LIBAVCODEC    = 1
 INTERNAL_LIBAVFORMAT   = 1
 INTERNAL_LIBAVUTIL     = 1

@@ -76,8 +76,8 @@ static retro_environment_t CORE_PREFIX(environ_cb);
 static retro_input_poll_t CORE_PREFIX(input_poll_cb);
 static retro_input_state_t CORE_PREFIX(input_state_cb);
 
-#define LOG_ERR(msg) do { \
-   log_cb(RETRO_LOG_ERROR, "[FFmpeg]: " msg "\n"); \
+#define LOG_ERR(msg, args...) do {			   \
+    log_cb(RETRO_LOG_ERROR, "[FFmpeg]: " msg "\n", #args);	   \
 } while(0)
 
 /* FFmpeg context data. */
@@ -1461,6 +1461,39 @@ static void context_reset(void)
 }
 #endif
 
+void av_log_cb(void* ptr, int level, const char* fmt, va_list vl)
+{
+    char line[1024];
+    int retro_level = RETRO_LOG_ERROR;
+
+    switch (level) {
+    case AV_LOG_ERROR:
+    case AV_LOG_QUIET:
+    case AV_LOG_PANIC:
+    case AV_LOG_FATAL:
+	    retro_level = RETRO_LOG_ERROR;
+	    break;
+    case AV_LOG_WARNING:
+	    retro_level = RETRO_LOG_WARN;
+	    break;
+    case AV_LOG_INFO:
+    case AV_LOG_VERBOSE:
+	    retro_level = RETRO_LOG_INFO;
+	    break;
+    case AV_LOG_DEBUG:
+    case AV_LOG_TRACE:
+      	    retro_level = RETRO_LOG_DEBUG;
+	    break;
+    default:
+	    retro_level = RETRO_LOG_ERROR;
+	    break;
+    }
+ 
+    vsnprintf(line, sizeof(line), fmt, vl);
+
+    log_cb(retro_level, "av_log: %s", line);
+}
+
 void CORE_PREFIX(retro_unload_game)(void)
 {
    unsigned i;
@@ -1568,6 +1601,8 @@ bool CORE_PREFIX(retro_load_game)(const struct retro_game_info *info)
       { 0 },
    };
 
+   av_log_set_callback(av_log_cb);
+
    if (!info)
       return false;
 
@@ -1579,19 +1614,31 @@ bool CORE_PREFIX(retro_load_game)(const struct retro_game_info *info)
       goto error;
    }
 
-   if (avformat_open_input(&fctx, info->path, NULL, NULL) < 0)
+   // 3DS prefixes paths with device. E.g. sdmc0:/myfile.avi but
+   // ffmpeg tries to find "sdmc0" protocol. Prefix with file:// to
+   // make a valid URL
+#ifdef _3DS
+   char *path = malloc (strlen(info->path) + 10);
+   strcpy(path, "file://");
+   strcat(path, info->path);
+#else
+   const char *path = info->path;
+#endif
+   int err;
+
+   if ((err = avformat_open_input(&fctx, path, NULL, NULL)) < 0)
    {
-      LOG_ERR("Failed to open input.");
+      LOG_ERR("Failed to open input: %x.", -err);
       goto error;
    }
 
-   if (avformat_find_stream_info(fctx, NULL) < 0)
+   if ((err = avformat_find_stream_info(fctx, NULL)) < 0)
    {
-      LOG_ERR("Failed to find stream info.");
+      LOG_ERR("Failed to find stream info: %x.", -err);
       goto error;
    }
 
-   av_dump_format(fctx, 0, info->path, 0);
+   av_dump_format(fctx, 0, path, 0);
 
    if (!open_codecs())
    {
@@ -1717,7 +1764,7 @@ void CORE_PREFIX(retro_cheat_set)(unsigned index, bool enabled, const char *code
    (void)code;
 }
 
-#if defined(LIBRETRO_SWITCH)
+#if defined(LIBRETRO_EMBED_FFMPEG)
 
 #ifdef ARCH_X86
 #include "../libswresample/resample.h"

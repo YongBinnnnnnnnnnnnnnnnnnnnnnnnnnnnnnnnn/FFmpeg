@@ -1,4 +1,4 @@
-LIBRETRO_SWITCH        = 0
+LIBRETRO_EMBED_FFMPEG        = 0
 
 INTERNAL_LIBAVCODEC    = 0
 INTERNAL_LIBAVFORMAT   = 0
@@ -101,7 +101,7 @@ endif
 else ifneq (,$(findstring osx,$(platform)))
 
    ARCH_X86 = 1
-   LIBRETRO_SWITCH = 1
+   LIBRETRO_EMBED_FFMPEG = 1
    TARGET := $(TARGET_NAME)_libretro.dylib
    fpic := -fPIC
    SHARED := -dynamiclib
@@ -121,10 +121,24 @@ endif
 	HAVE_SOCKLEN = 1
 	HAVE_PTHREADS=1
 
+# CTR (3DS)
+else ifeq ($(platform), ctr)
+	TARGET := $(TARGET_NAME)_libretro_$(platform).a
+	CC = $(DEVKITARM)/bin/arm-none-eabi-gcc$(EXE_EXT)
+	CXX = $(DEVKITARM)/bin/arm-none-eabi-g++$(EXE_EXT)
+	AR = $(DEVKITARM)/bin/arm-none-eabi-ar$(EXE_EXT)
+	CFLAGS += -D_3DS -DARM11 -march=armv6k -mtune=mpcore -mfloat-abi=hard -I$(DEVKITPRO)/libctru/include -DHAVE_STDINT_H=1 -DHAVE_INT32_T=1 -DHAVE_STRUCT_ADDRINFO=1 -DHAVE_STRUCT_SOCKADDR_STORAGE=1 -include stdint.h -include libretro-common/rthreads/ctr_pthread.h -DHAVE_ARPA_INET_H=1 -DCONFIG_NETWORK=1 -DHAVE_SOCKLEN_T=1 -Dstrtoumax=strtoull -DCONFIG_FILE_PROTOCOL=1
+	HAVE_POLL_H = 1
+	CXXFLAGS += -D_3DS -DARM11 -march=armv6k -mtune=mpcore -mfloat-abi=hard -I$(DEVKITPRO)/libctru/include -DHAVE_STDINT_H=1 -DHAVE_INT32_T=1 -DHAVE_STRUCT_ADDRINFO=1 -DHAVE_STRUCT_SOCKADDR_STORAGE=1 -DHAVE_ARPA_INET_H=1 -DCONFIG_NETWORK=1 -DHAVE_SOCKLEN_T=1 -Dstrtoumax=strtoull -DCONFIG_FILE_PROTOCOL=1
+	STATIC_LINKING = 1
+	BAKE_IN_FFMPEG := 1
+	LIBRETRO_EMBED_FFMPEG := 1
+	ARCH_X86 = 0
+	HAVE_GETADDRINFO := 1
 else ifneq (,$(findstring ios,$(platform)))
 
    #ARCH_ARM = 1
-   LIBRETRO_SWITCH = 1
+   LIBRETRO_EMBED_FFMPEG = 1
    TARGET := $(TARGET_NAME)_libretro_ios.dylib
    fpic := -fPIC
    SHARED := -dynamiclib
@@ -174,7 +188,7 @@ else ifeq ($(platform), emscripten)
 	TARGET := $(TARGET_NAME)_libretro_$(platform).bc
 	STATIC_LINKING=1
    HAVE_PTHREADS=1
-   LIBRETRO_SWITCH = 1
+   LIBRETRO_EMBED_FFMPEG = 1
 	CFLAGS += -DHAVE_UNISTD_H
 	CFLAGS += -DHAVE_STRUCT_SOCKADDR_STORAGE -DHAVE_STRUCT_ADDRINFO
 	HAVE_POLL_H = 1
@@ -200,7 +214,7 @@ endif
    LIBS += -L.
 endif
 
-ifeq ($(LIBRETRO_SWITCH), 1)
+ifeq ($(LIBRETRO_EMBED_FFMPEG), 1)
    CFLAGS += -DUPSTREAM_VERSION=\"$(shell cat ../RELEASE)\"
 endif
 

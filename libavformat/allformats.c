@@ -387,7 +387,9 @@ void av_register_all(void)
     REGISTER_PROTOCOL(TLS_OPENSSL,      tls_openssl);
     REGISTER_PROTOCOL(UDP,              udp);
     REGISTER_PROTOCOL(UDPLITE,          udplite);
+#ifndef _3DS
     REGISTER_PROTOCOL(UNIX,             unix);
+#endif
 
     /* external libraries */
     REGISTER_DEMUXER (LIBGME,           libgme);
