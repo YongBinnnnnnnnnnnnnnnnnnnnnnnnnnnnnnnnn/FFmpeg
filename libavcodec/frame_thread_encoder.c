@@ -62,11 +62,11 @@ typedef struct{
 
     pthread_t worker[MAX_THREADS];
     int exit;
-} ThreadContext;
+} FFThreadContext;
 
 static void * attribute_align_arg worker(void *v){
     AVCodecContext *avctx = v;
-    ThreadContext *c = avctx->internal->frame_thread_encoder;
+    FFThreadContext *c = avctx->internal->frame_thread_encoder;
     AVPacket *pkt = NULL;
 
     while(!c->exit){
@@ -118,7 +118,7 @@ end:
 
 int ff_frame_thread_encoder_init(AVCodecContext *avctx, AVDictionary *options){
     int i=0;
-    ThreadContext *c;
+    FFThreadContext *c;
 
 
     if(   !(avctx->thread_type & FF_THREAD_FRAME)
@@ -170,7 +170,7 @@ int ff_frame_thread_encoder_init(AVCodecContext *avctx, AVDictionary *options){
         return AVERROR(EINVAL);
 
     av_assert0(!avctx->internal->frame_thread_encoder);
-    c = avctx->internal->frame_thread_encoder = av_mallocz(sizeof(ThreadContext));
+    c = avctx->internal->frame_thread_encoder = av_mallocz(sizeof(FFThreadContext));
     if(!c)
         return AVERROR(ENOMEM);
 
@@ -226,7 +226,7 @@ fail:
 
 void ff_frame_thread_encoder_free(AVCodecContext *avctx){
     int i;
-    ThreadContext *c= avctx->internal->frame_thread_encoder;
+    FFThreadContext *c= avctx->internal->frame_thread_encoder;
 
     pthread_mutex_lock(&c->task_fifo_mutex);
     c->exit = 1;
@@ -247,7 +247,7 @@ void ff_frame_thread_encoder_free(AVCodecContext *avctx){
 }
 
 int ff_thread_video_encode_frame(AVCodecContext *avctx, AVPacket *pkt, const AVFrame *frame, int *got_packet_ptr){
-    ThreadContext *c = avctx->internal->frame_thread_encoder;
+    FFThreadContext *c = avctx->internal->frame_thread_encoder;
     Task task;
     int ret;
 
