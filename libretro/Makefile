@@ -122,6 +122,24 @@ endif
 	HAVE_SOCKLEN = 1
 	HAVE_PTHREADS=1
 
+# Nintendo Switch (libnx)
+else ifeq ($(platform), libnx)
+    include $(DEVKITPRO)/libnx/switch_rules
+    EXT=a
+    TARGET := $(TARGET_NAME)_libretro_$(platform).$(EXT)
+    DEFINES := -DSWITCH=1 -D__SWITCH__=1 -DHAVE_LIBNX=1 
+    CFLAGS	:=	 $(DEFINES) -g -fPIE -I$(LIBNX)/include/ -I$(PORTLIBS)/include/ -ffunction-sections -fdata-sections -ftls-model=local-exec
+    CFLAGS += $(INCDIRS) -I$(CORE_DIR)/zlib -I$(CORE_DIR)/libogg/include -I$(CORE_DIR)/libvorbis/include \
+		-I$(CORE_DIR)/jpeg-8c -fvisibility=hidden
+    CFLAGS	+= -march=armv8-a -mtune=cortex-a57 -mtp=soft -mcpu=cortex-a57+crc+fp+simd
+    CFLAGS += -DHAVE_STDINT_H=1 -DHAVE_INT32_T=1 -DHAVE_STRUCT_ADDRINFO=1 -DHAVE_STRUCT_SOCKADDR_STORAGE=1 -DHAVE_ARPA_INET_H=1 -DCONFIG_NETWORK=1 -DHAVE_SOCKLEN_T=1 -DCONFIG_FILE_PROTOCOL=1
+    CXXFLAGS := $(ASFLAGS) $(CFLAGS)
+    STATIC_LINKING = 1
+    HAVE_POLL_H = 1
+	BAKE_IN_FFMPEG := 0
+	LIBRETRO_EMBED_FFMPEG := 0
+	ARCH_X86 = 0
+	HAVE_GETADDRINFO := 1
 # CTR (3DS)
 else ifeq ($(platform), ctr)
 	TARGET := $(TARGET_NAME)_libretro_$(platform).a
