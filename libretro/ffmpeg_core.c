@@ -76,8 +76,8 @@ static retro_environment_t CORE_PREFIX(environ_cb);
 static retro_input_poll_t CORE_PREFIX(input_poll_cb);
 static retro_input_state_t CORE_PREFIX(input_state_cb);
 
-#define LOG_ERR(msg) do { \
-   log_cb(RETRO_LOG_ERROR, "[FFmpeg]: " msg "\n"); \
+#define LOG_ERR(msg, args...) do {			   \
+    log_cb(RETRO_LOG_ERROR, "[FFmpeg]: " msg "\n", #args);	   \
 } while(0)
 
 /* FFmpeg context data. */
@@ -1624,16 +1624,17 @@ bool CORE_PREFIX(retro_load_game)(const struct retro_game_info *info)
 #else
    const char *path = info->path;
 #endif
+   int err;
 
-   if (avformat_open_input(&fctx, path, NULL, NULL) < 0)
+   if ((err = avformat_open_input(&fctx, path, NULL, NULL)) < 0)
    {
-      LOG_ERR("Failed to open input.");
+      LOG_ERR("Failed to open input: %x.", -err);
       goto error;
    }
 
-   if (avformat_find_stream_info(fctx, NULL) < 0)
+   if ((err = avformat_find_stream_info(fctx, NULL)) < 0)
    {
-      LOG_ERR("Failed to find stream info.");
+      LOG_ERR("Failed to find stream info: %x.", -err);
       goto error;
    }
 
