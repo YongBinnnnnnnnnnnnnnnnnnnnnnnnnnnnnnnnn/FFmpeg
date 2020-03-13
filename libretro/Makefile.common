@@ -21,7 +21,7 @@ INCFLAGS           += -I$(BASE_DIR) -I$(CORE_DIR) -I$(LIBRETRO_COMM_DIR)/include
 LIBRETRO_SOURCE    += $(CORE_DIR)/ffmpeg_core.c \
 			 $(LIBRETRO_COMM_DIR)/rthreads/rthreads.c
 
-ifeq ($(STATIC_LINKING), 0)
+ifneq ($(STATIC_LINKING), 1)
 LIBRETRO_SOURCE    += 	 $(LIBRETRO_COMM_DIR)/queues/fifo_queue.c
 endif
 

@@ -19,6 +19,7 @@ INTERNAL_ZLIB          = 0
 INTERNAL_WAVPACK       = 0
 INTERNAL_XVIDCORE      = 0
 INTERNAL_VPX           = 0
+STATIC_LINKING         = 0
 
 WANT_LIBASS            = 0
 
