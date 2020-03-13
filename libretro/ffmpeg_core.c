@@ -1764,7 +1764,7 @@ void CORE_PREFIX(retro_cheat_set)(unsigned index, bool enabled, const char *code
    (void)code;
 }
 
-#if defined(LIBRETRO_SWITCH)
+#if defined(LIBRETRO_EMBED_FFMPEG)
 
 #ifdef ARCH_X86
 #include "../libswresample/resample.h"
