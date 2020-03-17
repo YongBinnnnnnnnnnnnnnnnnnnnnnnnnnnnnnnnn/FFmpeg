@@ -1617,7 +1617,7 @@ bool CORE_PREFIX(retro_load_game)(const struct retro_game_info *info)
    // 3DS prefixes paths with device. E.g. sdmc0:/myfile.avi but
    // ffmpeg tries to find "sdmc0" protocol. Prefix with file:// to
    // make a valid URL
-#ifdef _3DS
+#if defined(_3DS) || defined(__SWITCH__)
    char *path = malloc (strlen(info->path) + 10);
    strcpy(path, "file://");
    strcat(path, info->path);
