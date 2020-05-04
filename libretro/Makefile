@@ -99,6 +99,28 @@ endif
 	HAVE_SOCKLEN = 1
 	HAVE_PTHREADS=1
 
+else ifneq (,$(findstring qnx,$(platform)))
+ARCH_X86 = 0
+ARCH_X86_64 = 0
+   TARGET := $(TARGET_NAME)_libretro_$(platform).so
+   fpic := -fPIC
+   SHARED := -shared -Wl,--version-script=link.T -Wl,--no-undefined -fPIC
+   GL_LIB := -lGLESv2
+   GLES := 1
+	HAVE_OPENGL = 1
+	HAVE_GL_FFT := 1
+   HAVE_SSA := 0
+   CC = qcc -Vgcc_ntoarmv7le
+   CXX = QCC -Vgcc_ntoarmv7le
+
+	HAVE_POLL_H = 1
+	HAVE_GETADDRINFO = 1
+	HAVE_NETWORK = 1
+	HAVE_SOCKLEN = 1
+	HAVE_PTHREADS=1
+	BAKE_IN_FFMPEG := 1
+LIBRETRO_EMBED_FFMPEG := 1
+
 else ifneq (,$(findstring osx,$(platform)))
 
    ARCH_X86 = 1
