@@ -142,6 +142,8 @@ DEFINES += -DHAVE_GMTIME_R -DHAVE_LOCALTIME_R
 
 ifneq (,$(findstring unix,$(platform)))
 	DEFINES += -DHAVE_STRUCT_SOCKADDR_STORAGE -DHAVE_STRUCT_ADDRINFO -DHAVE_FMINF
+else ifneq (,$(findstring qnx,$(platform)))
+	DEFINES += -DHAVE_STRUCT_SOCKADDR_STORAGE -DHAVE_STRUCT_ADDRINFO -DHAVE_FMINF -DHAVE_SYNC_VAL_COMPARE_AND_SWAP=1
 else ifneq (,$(findstring osx,$(platform)))
 	DEFINES += -DHAVE_STRUCT_SOCKADDR_STORAGE -DHAVE_STRUCT_ADDRINFO
 endif
@@ -168,7 +170,13 @@ endif
 endif
 
 ifeq ($(HAVE_PTHREADS),1)
+ifneq ($(platform), qnx)
 LIBS += -lpthread
+endif
+endif
+
+ifeq ($(platform), qnx)
+LIBS += -lsocket
 endif
 
 SOURCES_C := 	$(GL_SOURCE) \
