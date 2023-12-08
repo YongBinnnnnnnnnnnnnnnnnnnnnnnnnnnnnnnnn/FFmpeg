@@ -18,7 +18,7 @@
  * License along with FFmpeg; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
-
+#if !defined(SF2000)
 /**
  * @file
  * UDP protocol
@@ -989,3 +989,4 @@ URLProtocol ff_udplite_protocol = {
     .priv_data_class     = &udplite_context_class,
     .flags               = URL_PROTOCOL_FLAG_NETWORK,
 };
+#endif

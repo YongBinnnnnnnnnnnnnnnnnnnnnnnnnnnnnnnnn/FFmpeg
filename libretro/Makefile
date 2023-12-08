@@ -93,11 +93,11 @@ ifeq ($(OPENGL),1)
 endif
    HAVE_SSA := 1
 
-	HAVE_POLL_H = 1
-	HAVE_GETADDRINFO = 1
-	HAVE_NETWORK = 1
-	HAVE_SOCKLEN = 1
-	HAVE_PTHREADS=1
+   HAVE_POLL_H = 1
+   HAVE_GETADDRINFO = 1
+   HAVE_NETWORK = 1
+   HAVE_SOCKLEN = 1
+   HAVE_PTHREADS=1
 
 else ifneq (,$(findstring qnx,$(platform)))
 ARCH_X86 = 0
@@ -176,6 +176,33 @@ else ifeq ($(platform), ctr)
 	LIBRETRO_EMBED_FFMPEG := 1
 	ARCH_X86 = 0
 	HAVE_GETADDRINFO := 1
+# SF2000
+else ifeq ($(platform), sf2000)
+   TARGET := $(TARGET_NAME)_libretro_$(platform).a
+   MIPS:=/opt/mips32-mti-elf/2019.09-03-2/bin/mips-mti-elf-
+   CC = $(MIPS)gcc
+   CXX = $(MIPS)g++
+   AR = $(MIPS)ar
+   CFLAGS = -EL -march=mips32 -mtune=mips32 -msoft-float -G0 -mno-abicalls -fno-pic
+   CFLAGS += -ffast-math -fomit-frame-pointer -ffunction-sections -fdata-sections 
+   CFLAGS += -DSF2000
+   CXXFLAGS = $(CFLAGS)
+   STATIC_LINKING = 1
+   OPENGL = 0
+   INTERNAL_LIBAVCODEC    = 1
+   INTERNAL_LIBAVFORMAT   = 1
+   INTERNAL_LIBAVUTIL     = 1
+   INTERNAL_LIBSWRESAMPLE = 1
+   INTERNAL_LIBSWSCALE    = 1
+   INTERNAL_ZLIB = 1
+   HAVE_THREADS = 0
+   HAVE_PTHREADS = 0
+   HAVE_NETWORK = 0
+   HAVE_SOCKLEN = 0
+   HAVE_WINSOCK2_H = 0
+   ARCH_X86 = 0
+   ARCH_X86_64=0
+   ARCH_ARM = 0
 else ifneq (,$(findstring ios,$(platform)))
 
    #ARCH_ARM = 1

@@ -17,7 +17,7 @@
  * License along with FFmpeg; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
-
+#if !defined(SF2000)
 #include <vorbis/vorbisenc.h>
 
 #include "libavutil/avassert.h"
@@ -378,3 +378,4 @@ AVCodec ff_libvorbis_encoder = {
     .priv_class     = &vorbis_class,
     .defaults       = defaults,
 };
+#endif

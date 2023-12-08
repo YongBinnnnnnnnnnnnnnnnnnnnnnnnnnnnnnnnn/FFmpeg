@@ -18,7 +18,7 @@
  * License along with FFmpeg; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
-
+#if !defined(SF2000)
 /**
  * @file
  * @brief Microsoft RTP/ASF support
@@ -314,3 +314,4 @@ RTPDynamicProtocolHandler ff_ms_rtp_ ## n ## _handler = { \
 
 RTP_ASF_HANDLER(asf_pfv, "x-asf-pf",  AVMEDIA_TYPE_VIDEO);
 RTP_ASF_HANDLER(asf_pfa, "x-asf-pf",  AVMEDIA_TYPE_AUDIO);
+#endif

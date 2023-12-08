@@ -18,7 +18,7 @@
  * License along with FFmpeg; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
-
+#if !defined(SF2000)
 #include "avformat.h"
 #include "libavutil/parseutils.h"
 #include "libavutil/random_seed.h"
@@ -270,3 +270,4 @@ AVOutputFormat ff_sap_muxer = {
     .write_trailer     = sap_write_close,
     .flags             = AVFMT_NOFILE | AVFMT_GLOBALHEADER,
 };
+#endif

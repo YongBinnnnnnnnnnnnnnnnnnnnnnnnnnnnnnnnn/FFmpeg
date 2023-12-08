@@ -18,6 +18,7 @@
  * License along with FFmpeg; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
+#if !defined(SF2000)
 #include "avformat.h"
 #include "libavutil/avassert.h"
 #include "libavutil/parseutils.h"
@@ -255,3 +256,4 @@ URLProtocol ff_tcp_protocol = {
     .flags               = URL_PROTOCOL_FLAG_NETWORK,
     .priv_data_class     = &tcp_class,
 };
+#endif

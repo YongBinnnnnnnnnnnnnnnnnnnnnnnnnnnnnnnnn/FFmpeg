@@ -18,7 +18,7 @@
  * License along with FFmpeg; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
-
+#if !defined(SF2000)
 #include "libavutil/avstring.h"
 #include "libavutil/intreadwrite.h"
 #include "libavutil/mathematics.h"
@@ -973,3 +973,4 @@ AVInputFormat ff_rtsp_demuxer = {
     .read_pause     = rtsp_read_pause,
     .priv_class     = &rtsp_demuxer_class,
 };
+#endif

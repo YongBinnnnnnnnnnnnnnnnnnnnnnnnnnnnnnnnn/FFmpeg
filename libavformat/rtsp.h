@@ -18,6 +18,7 @@
  * License along with FFmpeg; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
+#if !defined(SF2000)
 #ifndef AVFORMAT_RTSP_H
 #define AVFORMAT_RTSP_H
 
@@ -635,3 +636,4 @@ int ff_rtsp_open_transport_ctx(AVFormatContext *s, RTSPStream *rtsp_st);
 extern const AVOption ff_rtsp_options[];
 
 #endif /* AVFORMAT_RTSP_H */
+#endif

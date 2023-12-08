@@ -18,7 +18,7 @@
  * License along with FFmpeg; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
-
+#if !defined(SF2000)
 /**
  * @file
  * Interface to libfaac for aac encoding.
@@ -246,3 +246,4 @@ AVCodec ff_libfaac_encoder = {
     .profiles       = NULL_IF_CONFIG_SMALL(profiles),
     .channel_layouts = faac_channel_layouts,
 };
+#endif

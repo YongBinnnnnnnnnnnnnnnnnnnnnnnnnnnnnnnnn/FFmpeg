@@ -27,7 +27,7 @@
  * ASF specification. Revision 01.20.03.
  *  [2]http://msdn.microsoft.com/en-us/library/bb643323.aspx
  */
-
+#if !defined(SF2000)
 #include "avformat.h"
 #include "mms.h"
 #include "internal.h"
@@ -636,3 +636,4 @@ URLProtocol ff_mmst_protocol = {
     .priv_data_size = sizeof(MMSTContext),
     .flags          = URL_PROTOCOL_FLAG_NETWORK,
 };
+#endif

@@ -18,7 +18,7 @@
  * License along with FFmpeg; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
-
+#if !defined(SF2000)
 /**
  * @file
  * Interface to libmp3lame for mp3 encoding.
@@ -320,3 +320,4 @@ AVCodec ff_libmp3lame_encoder = {
     .priv_class            = &libmp3lame_class,
     .defaults              = libmp3lame_defaults,
 };
+#endif

@@ -29,7 +29,7 @@
 #include "config.h"
 
 #if CONFIG_ZLIB
-#include <zlib.h>
+#include "../libretro/libretro-common/include/compat/zlib.h"
 #endif
 
 #include "libavutil/avstring.h"

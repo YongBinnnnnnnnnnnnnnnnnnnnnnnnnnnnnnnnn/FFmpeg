@@ -18,7 +18,7 @@
  * License along with FFmpeg; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
-
+#if !defined(SF2000)
 /**
  * @file
  *
@@ -152,3 +152,4 @@ URLProtocol ff_unix_protocol = {
     .priv_data_class     = &unix_class,
     .flags               = URL_PROTOCOL_FLAG_NETWORK,
 };
+#endif

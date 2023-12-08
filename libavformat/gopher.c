@@ -21,7 +21,7 @@
  * License along with FFmpeg; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
-
+#if !defined(SF2000)
 #include "libavutil/avstring.h"
 #include "avformat.h"
 #include "internal.h"
@@ -123,3 +123,4 @@ URLProtocol ff_gopher_protocol = {
     .priv_data_size = sizeof(GopherContext),
     .flags          = URL_PROTOCOL_FLAG_NETWORK,
 };
+#endif

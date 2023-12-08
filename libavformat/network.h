@@ -17,7 +17,7 @@
  * License along with FFmpeg; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
-
+#if !defined(SF2000)
 #ifndef AVFORMAT_NETWORK_H
 #define AVFORMAT_NETWORK_H
 
@@ -298,3 +298,4 @@ int ff_http_match_no_proxy(const char *no_proxy, const char *hostname);
 int ff_socket(int domain, int type, int protocol);
 
 #endif /* AVFORMAT_NETWORK_H */
+#endif

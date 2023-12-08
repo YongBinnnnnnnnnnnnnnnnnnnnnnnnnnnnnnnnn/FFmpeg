@@ -18,7 +18,7 @@
  * License along with FFmpeg; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
-
+#if !defined(SF2000)
 #include "libavutil/avassert.h"
 #include "libavutil/base64.h"
 #include "libavutil/avstring.h"
@@ -2463,3 +2463,4 @@ AVInputFormat ff_rtp_demuxer = {
     .priv_class     = &rtp_demuxer_class,
 };
 #endif /* CONFIG_RTP_DEMUXER */
+#endif

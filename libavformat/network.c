@@ -17,7 +17,7 @@
  * License along with FFmpeg; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
-
+#if !defined(SF2000)
 #include <fcntl.h>
 #include "network.h"
 #include "tls.h"
@@ -333,3 +333,4 @@ int ff_http_match_no_proxy(const char *no_proxy, const char *hostname)
     av_free(buf);
     return ret;
 }
+#endif

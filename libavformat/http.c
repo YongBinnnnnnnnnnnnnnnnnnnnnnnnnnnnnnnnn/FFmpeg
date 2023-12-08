@@ -18,7 +18,7 @@
  * License along with FFmpeg; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
-
+#if !defined(SF2000)
 #include "config.h"
 
 #if CONFIG_ZLIB
@@ -1626,3 +1626,4 @@ URLProtocol ff_httpproxy_protocol = {
     .flags               = URL_PROTOCOL_FLAG_NETWORK,
 };
 #endif /* CONFIG_HTTPPROXY_PROTOCOL */
+#endif

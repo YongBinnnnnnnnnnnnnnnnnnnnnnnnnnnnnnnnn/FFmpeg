@@ -17,7 +17,7 @@
  * License along with FFmpeg; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
-
+#if !defined(SF2000)
 #include <vorbis/vorbisenc.h>
 
 #include "avcodec.h"
@@ -205,3 +205,4 @@ AVCodec ff_libvorbis_decoder = {
     .close          = oggvorbis_decode_close,
     .capabilities   = AV_CODEC_CAP_DELAY,
 };
+#endif

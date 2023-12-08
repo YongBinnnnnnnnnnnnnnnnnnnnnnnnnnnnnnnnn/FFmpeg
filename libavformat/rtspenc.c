@@ -18,7 +18,7 @@
  * License along with FFmpeg; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
-
+#if !defined(SF2000)
 #include "avformat.h"
 
 #if HAVE_POLL_H
@@ -251,3 +251,4 @@ AVOutputFormat ff_rtsp_muxer = {
     .flags             = AVFMT_NOFILE | AVFMT_GLOBALHEADER,
     .priv_class        = &rtsp_muxer_class,
 };
+#endif

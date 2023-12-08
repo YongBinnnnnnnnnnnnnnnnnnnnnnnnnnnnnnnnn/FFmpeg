@@ -18,7 +18,7 @@
  * License along with FFmpeg; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
-
+#if !defined(SF2000)
 
 #include "libavutil/avstring.h"
 #include "libavutil/bprint.h"
@@ -217,3 +217,4 @@ URLProtocol ff_icecast_protocol = {
     .priv_data_class = &icecast_context_class,
     .flags           = URL_PROTOCOL_FLAG_NETWORK,
 };
+#endif
