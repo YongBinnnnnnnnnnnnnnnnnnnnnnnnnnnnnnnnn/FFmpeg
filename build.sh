@@ -1,7 +1,6 @@
 #!/bin/bash
 
-
-export LDFLAGS="-EL -nostdlib -z max-page-size=32"
+export LDFLAGS="-lc -lcfe -lc -EL -z max-page-size=32"
 export CXX_LDFLAGS="-EL -Wl,--gc-sections --static -z max-page-size=32"
 
 export CFLAGS="-EL -Os -G0 -mno-abicalls -fno-pic -ffunction-sections -fdata-sections -I ../../libs/libretro-common/include"
@@ -14,5 +13,6 @@ sed -i config.h -e "s|#define getenv(x) NULL|inline char* getenv(const char *a){
 sed -i libavutil/time_internal.h -e "s|static inline|inline|g"
 sed -i ffmpeg.c -e "s|.*3 system signals.*||g"
 make
-
-
+export CC=/opt/mips32-mti-elf/2019.09-03-2/bin/mips-mti-elf-gcc
+cd libretro
+platform=sf2000 make
